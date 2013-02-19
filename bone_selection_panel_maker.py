@@ -29,8 +29,21 @@ class bone_selection_panel(bpy.types.Panel):
         layout = self.layout
         layout.operator("pose.bone_selector_op")
 
+class bone_selector( bpy.types.Operator ):
+   bl_idname      = "pose.bone_selector_op"
+   bl_label       = "Select predefined bones"
+   bl_description = "Selects a group of bones for your convience"
+   bl_options     = {'REGISTER', 'UNDO' }  # Enable undo
 
+   @classmethod
+   def poll(cls, context):
+      # Find out how to check if the armature is in pose mode
+      # return context.active_object.mode == 'POSE_MODE'
+      return True
+
+   def execute( self, context):
 """
+textfile.write(start_string) # Write constant initial string to text file
 
 # List all existing bone names
 bone_names     = [ name for bone.name in bpy.context.object.data.bones ]
@@ -39,6 +52,10 @@ selected_bones = [ name for bone.name in bpy.context.object.data.bones if bone.s
 for name in bone_names:
    # TODO:
    # Check if you can deslect all bones via bpy operators
+   # bpy.ops.armature.select_all(action='DESELECT')
+
+   textfile.write("\t\t") # Double indent   
+
    if name in selected_bones:
       textfile.write("bpy.context.object.data.bones['%s'].select = True" % bone.name  + "\n")
    else:

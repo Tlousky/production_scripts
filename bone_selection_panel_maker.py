@@ -1,3 +1,10 @@
+bl_info = {
+    "name"     : "Bone Selection Facilitator",
+    "category" : "Animation",
+    "author"   : "Tamir Lousky",
+    "version"  : "1.0"
+}
+
 import bpy, time
 
 prefix   = 'bone_selector_'             # Textfile prefix
@@ -8,13 +15,7 @@ filename = prefix + str(now_time)       # Concatenate prefix and time to create 
 bpy.data.texts.new(name=filename)
 textfile = bpy.data.texts[filename]
 
-start_string = """
-bl_info = {
-    "name"     : "Bone Selection Panel",
-    "category" : "Animation",
-    "author"   : "Tamir Lousky",
-    "version"  : "1.0"
-}
+textfile_template = """
 
 import bpy
 

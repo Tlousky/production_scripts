@@ -1,36 +1,19 @@
+bl_info = {
+    "name"     : "Armature parenting tree generator",
+    "category" : "Rigging",
+    "authors"   : "Tamir Lousky",
+    "version"  : "1.0"
+}
+
 import bpy
 
-rig   = bpy.context.object
-bones = rig.data.bones
-
-# find root bone
-root = ''
-for bone in bones:
-	if not bone.parent:
-		root = bone.name
-
-# create references to node tree and node links
-tree  = bpy.context.scene.node_tree
-links = tree.links
-
-# clear default nodes
-for n in tree.nodes:
-    tree.nodes.remove(n)
-
-# create first node's location
-(row, x, y) = (0, 0, 0)
-
 def create_node( bone, x, y, row ):
-    """
-    recursive function that creates a math node for each bone in the armature
-    and draws connections between bones (math nodes) according to parenting
-    """
-    # create new nodes
-    node = tree.nodes.new('MATH')
+    """ recursive function that creates a math node for each bone in the armature
+    and draws connections between the bones (math nodes) and their parents """
 
-    no_of_children = len(bone.children)
-    
-    # set up node location, label and name
+    node = tree.nodes.new('MATH') # create a new math node
+
+    # set up node location, label and name, and minimize (hide) the node
     node.location = x,y
     node.label    = bone.name
     node.name     = bone.name
@@ -40,31 +23,23 @@ def create_node( bone, x, y, row ):
     if bone.parent:
         parent_name = bone.parent.name
         parent_node = tree.nodes[parent_name]
-        links.new(parent_node.outputs[0],node.inputs[0])
+        links.new( parent_node.outputs[0], node.inputs[0] )
     
     # iterate over all the current's bone's children and draw their nodes
-
-    row += 1
-   
-    i = 1
+    row += 1 # the row represents each "generation" visually via x axis distance
     for child in bone.children:
         x = 200 * row
         y = 0
         create_node( child, x, y, row )
-        i += 1
-
-# Draw tree (from root bone)
-create_node( bones[root], x, 0, row )
 
 def set_node_height( node, i, yp ):
-    """
-    recurse all nodes and set their height
-    according to the parenting structure
-    """
+    """ recurse all nodes and set their height
+    according to the parenting structure """
+
     n = len(node.outputs[0].links) # count the number of children
-    y = yp + (i + n) * -30         # set y value to depend on the: parent's y value,
+    y = yp + (i + n) * -30         # calculate y value according to: parent's y value,
                                    # no. of children and the position of current bone in children
-    node.location.y = y
+    node.location.y = y            # set the node's actual y location value
     
     j = 0
     for link in node.outputs[0].links: # iterate current node's links
@@ -72,8 +47,34 @@ def set_node_height( node, i, yp ):
         j += 1
         set_node_height( child, j, y )
 
-# iterate over all nodes and adjust their y value
-i = 0
-for node in tree.nodes:
-    set_node_height( node, i, 0 )
-    i += 1
+if not bpy.context.scene.use_nodes:
+    print( 'can only draw tree if you are using nodes in the rendering compositor' )
+else:
+    rig   = bpy.context.object  # reference the selected armature
+    bones = rig.data.bones      # reference bone data
+
+    # find root bone
+    root = ''
+    for bone in bones:
+        if not bone.parent:     # the root bone has no parent
+            root = bone.name
+
+    # create references to node tree and node links
+    tree  = bpy.context.scene.node_tree
+    links = tree.links
+
+    # clear existing nodes
+    for n in tree.nodes:
+        tree.nodes.remove(n)
+
+    # create root node's location
+    (row, x, y) = (0, 0, 0)
+
+    # Draw primary tree (starting from root bone)
+    create_node( bones[root], x, 0, row )
+
+    # iterate over all nodes and adjust their y value
+    i = 0
+    for node in tree.nodes:
+        set_node_height( node, i, 0 )
+        i += 1

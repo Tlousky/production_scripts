@@ -1,9 +1,13 @@
-bl_info = {
-    "name"     : "Armature parenting tree generator",
-    "category" : "Rigging",
-    "authors"   : "Tamir Lousky",
-    "version"  : "1.0"
-}
+bl_info = {    
+    "name"        : "Armature parenting tree generator",
+    "author"      : "Tamir Lousky",
+    "version"     : (1, 0, 0),
+    "blender"     : (2, 66, 0),
+    "category"    : "Rigging",
+    "wiki_url"    : "https://github.com/Tlousky/production_scripts/wiki/_new?wiki[name]=draw_parenting_tree.py",
+    "download_url": "https://github.com/Tlousky/production_scripts/blob/master/draw_parenting_tree.py",
+    "description" : "Creates a node tree representing the armature's bone parenting structure."
+    }
 
 import bpy
 
@@ -32,7 +36,7 @@ def create_node( bone, x, y, row ):
         y = 0
         create_node( child, x, y, row )
 
-def set_node_height( node, i, yp ):
+def set_node_height( linksnode, i, yp ):
     """ recurse all nodes and set their height
     according to the parenting structure """
 

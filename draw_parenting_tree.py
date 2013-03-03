@@ -39,7 +39,7 @@ def create_node( bone, x, y, row ):
 def set_node_height( linksnode, i, yp ):
     """ recurse all nodes and set their height
     according to the parenting structure """
-
+    print( linksnode, "I: ", i, "yp: ", yp )
     n = len(node.outputs[0].links) # count the number of children
     y = yp + (i + n) * -30         # calculate y value according to: parent's y value,
                                    # no. of children and the position of current bone in children

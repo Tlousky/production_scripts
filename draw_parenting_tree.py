@@ -92,3 +92,37 @@ i = 0
 for node in tree.nodes:
     set_node_height( node, i, 0 )
     i += 1
+
+# Draw constraints
+bpy.ops.object.mode_set(mode ='OBJECT')
+pb = bpy.context.object.pose.bones
+
+bones = [ node.name for node in tree.nodes ]
+
+for bone in bones:
+    pbone = pb[bone]
+    
+    for const in pbone.constraints:
+        ctype     = const.type
+        if const.subtarget:
+            subtarget = const.subtarget
+        else:
+            subtarget = bone
+
+        subtarget_node = tree.nodes[subtarget]
+                
+        cnode = tree.nodes.new('MATH')
+
+        # set up node location, label, color and name
+        cnode.label            = ctype
+        cnode.name             = node.name + "_" + ctype
+        cnode.color            = ( 0.5, 0, 0.5 )
+        cnode.use_custom_color = True
+
+        x = ( node.location[0] + subtarget_node.location[0] ) / 2
+        y = ( node.location[1] + subtarget_node.location[1] ) / 2        
+
+        cnode.location = x,y        
+
+        links.new(node.outputs[0],cnode.inputs[0])
+        links.new(cnode.outputs[0],subtarget_node.inputs[1])

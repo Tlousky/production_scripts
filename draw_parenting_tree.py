@@ -37,7 +37,7 @@ def create_node( bone, x, y, row ):
     and draws connections between bones (math nodes) according to parenting
     """
     # create new nodes
-    node = tree.nodes.new('MATH')
+    node = tree.nodes.new('MAP_RANGE')
 
     no_of_children = len(bone.children)
     
@@ -104,12 +104,14 @@ for bone in bones:
     
     for const in pbone.constraints:
         ctype     = const.type
-        if const.subtarget:
+        
+        subtarget = bone
+        try:
             subtarget = const.subtarget
-        else:
-            subtarget = bone
+        except:
+            pass
 
-        subtarget_node = tree.nodes[subtarget]
+        print( bone, " --> ", ctype, " --> ", subtarget )
                 
         cnode = tree.nodes.new('MATH')
 
@@ -119,10 +121,23 @@ for bone in bones:
         cnode.color            = ( 0.5, 0, 0.5 )
         cnode.use_custom_color = True
 
+        subtarget_node = tree.nodes[subtarget]
+        node           = tree.nodes[bone]
+
         x = ( node.location[0] + subtarget_node.location[0] ) / 2
-        y = ( node.location[1] + subtarget_node.location[1] ) / 2        
+        
+        if node.location[1] > subtarget_node.location[1]:
+            y = node.location[1] + 200
+        else:
+            y = subtarget_node.location[1] + 200
+
 
         cnode.location = x,y        
 
         links.new(node.outputs[0],cnode.inputs[0])
-        links.new(cnode.outputs[0],subtarget_node.inputs[1])
+
+        for i in range(len(subtarget_node.inputs)):
+            if not subtarget_node.inputs[i].links:
+                break
+
+        links.new(cnode.outputs[0],subtarget_node.inputs[i])

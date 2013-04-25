@@ -27,6 +27,9 @@
 #
 #  Acknowledgements 
 #  ================
+#  PitchiPoy: Niv Spigel (for coming up with the idea)
+#  Blender Institute: Brecht van Lommel (fixing a bug with the file
+#                     output node within 30 minutes of my reporting it!)
 
 bl_info = {    
     "name"       : "Save Layers and Passes",
@@ -302,6 +305,8 @@ class create_nodes( bpy.types.Operator ):
                 output_number += 1
                 
             rl_nodes_y += 300
+            
+            return {'FINISHED'}
         
         # Create composite node, just to enable rendering
         cnode = tree.nodes.new('COMPOSITE')

@@ -305,14 +305,14 @@ class create_nodes( bpy.types.Operator ):
                 output_number += 1
                 
             rl_nodes_y += 300
-            
-            return {'FINISHED'}
-        
+
         # Create composite node, just to enable rendering
         cnode = tree.nodes.new('COMPOSITE')
         
         # Link composite node with the last render layer created
         links.new( node.outputs[ 'Image' ], cnode.inputs[0] )
+        
+        return {'FINISHED'}
             
 
 def register():

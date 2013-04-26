@@ -38,8 +38,8 @@ bl_info = {
     "blender"    : (2, 66, 0),
     "category"   : "Render",
     "location"   : "Node Editor >> Tools",
-    "wiki_url"   : "",
-    "tracker_url": "",
+    "wiki_url"   : "https://github.com/Tlousky/production_scripts/wiki/save_all_renderlayers_And_passes.py",
+    "tracker_url": "https://github.com/Tlousky/production_scripts/blob/master/save_all_renderlayers_and_passes.py",
     "description": "Save all render layers and passes to files"
 }
 

@@ -72,10 +72,11 @@ class create_nodes( bpy.types.Operator ):
         
         pattern   = '^([\d\w_-]+)(\.blend)$'
         re_match  = re.match(pattern, blendfile)
-        basename  = ''
+        basename  = 'scene'  # Default to avoid empty strings
         
-        if len( re_match.groups() ) > 0:
-            basename  = re_match.groups()[0]
+        if re_match:
+            if len( re_match.groups() ) > 0:
+                basename  = re_match.groups()[0]
             
         return( basename )        
 

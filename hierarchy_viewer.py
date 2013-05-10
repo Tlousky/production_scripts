@@ -29,7 +29,7 @@
 #  
 
 bl_info = {    
-    "name"       : "Hierarchy Viewer",
+    "name"       : "Hierarchy editor",
     "author"     : "Tamir Lousky",
     "version"    : (0, 0, 1),
     "blender"    : (2, 67, 0),
@@ -37,7 +37,7 @@ bl_info = {
     "location"   : "3D View >> Header",
     "wiki_url"   : "",
     "tracker_url": "",
-    "description": "Save all render layers and passes to files"
+    "description": "Hypergraph-like parenting editor"
 }
 
 ﻿import bpy

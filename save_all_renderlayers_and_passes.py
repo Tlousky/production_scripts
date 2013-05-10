@@ -65,7 +65,7 @@ class create_nodes( bpy.types.Operator ):
 
     @classmethod
     def poll( self, context ):
-        return True
+        return context.scene.use_nodes
 
     def find_base_name( self ):
         blendfile = bpy.path.basename(bpy.data.filepath)

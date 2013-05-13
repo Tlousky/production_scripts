@@ -262,9 +262,29 @@ class create_nodes( bpy.types.Operator ):
         output_number = 0
         node = ''  # Initialize node so that it would exist outside the loop
 
+        node_types = {
+            67 : {
+                'RL' : 'CompositorNodeRLayers',
+                'OF' : 'CompositorNodeOutputFile',
+                'OC' : 'CompositorNodeComposite'
+            },
+            66 : {
+                'RL' : 'R_LAYERS',
+                'OF' : 'OUTPUT_FILE',
+                'OC' : 'COMPOSITE'
+            },
+        }
+        
+        # Get blender version
+        version = bpy.app.version[1]
+
         for rl in layers:
             # Create a new render layer node
-            node = tree.nodes.new('R_LAYERS')
+            node = ''
+            if version > 66:
+                node = tree.nodes.new( type = node_types[67]['RL'] )
+            else:
+                node = tree.nodes.new( type = node_types[66]['RL'] )
 
             # Set node location, label and name
             node.location = 0, rl_nodes_y
@@ -278,7 +298,11 @@ class create_nodes( bpy.types.Operator ):
                 ## Create a new file output node
                 
                 # Create file output node
-                output_node = tree.nodes.new('OUTPUT_FILE')
+                output_node = ''
+                if version > 66:
+                    output_node = tree.nodes.new( type = node_types[67]['OF'] )
+                else:
+                    output_node = tree.nodes.new( type = node_types[66]['OF'] )
 
                 # Select and activate file output node
                 output_node.select = True
@@ -308,7 +332,11 @@ class create_nodes( bpy.types.Operator ):
             rl_nodes_y += 300
 
         # Create composite node, just to enable rendering
-        cnode = tree.nodes.new('COMPOSITE')
+        cnode = ''
+        if version > 66:
+            cnode = tree.nodes.new( type = node_types[67]['OC'] )
+        else:
+            cnode = tree.nodes.new( type = node_types[66]['OC'] )
         
         # Link composite node with the last render layer created
         links.new( node.outputs[ 'Image' ], cnode.inputs[0] )

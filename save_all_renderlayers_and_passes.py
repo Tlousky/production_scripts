@@ -34,7 +34,7 @@
 bl_info = {    
     "name"       : "Save Layers and Passes",
     "author"     : "Tamir Lousky",
-    "version"    : (0, 0, 1),
+    "version"    : (0, 0, 2),
     "blender"    : (2, 66, 0),
     "category"   : "Render",
     "location"   : "Node Editor >> Tools",
@@ -140,9 +140,9 @@ class create_nodes( bpy.types.Operator ):
             if l.use_pass_environment:
                 pass_info = {
                     'filename' : imagebase + "_" + "gloss_color",
-                    'output'   : 'Glossy Color' 
+                    'output'   : 'Environment' 
                 }
-                layers[l.name].append( imagebase + "_" + "env" )
+                layers[l.name].append( pass_info )
             if l.use_pass_glossy_color:
                 pass_info = {
                     'filename' : imagebase + "_" + "gloss_color",
@@ -311,7 +311,7 @@ class create_nodes( bpy.types.Operator ):
                 # Set node position x,y values
                 file_node_x = 500 
                 file_node_y = 200 * output_number
-
+                
                 name = rl + "_" + rpass['output']
                 
                 # Set node location, label and name

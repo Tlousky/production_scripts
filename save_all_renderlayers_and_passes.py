@@ -23,7 +23,7 @@
 #  Studio (sponsor)  : Pitchipoy Animation Productions (www.pitchipoy.tv)
 # 
 #  Start of project              : 2013-04-04 by Tamir Lousky
-#  Last modified                 : 2013-17-05
+#  Last modified                 : 2013-06-08
 #
 #  Acknowledgements 
 #  ================
@@ -32,15 +32,15 @@
 #                     output node within 30 minutes of my reporting it!)
 
 bl_info = {    
-    "name"       : "Save Layers and Passes",
-    "author"     : "Tamir Lousky",
-    "version"    : (0, 0, 2),
-    "blender"    : (2, 66, 0),
+    "name"       : "Save Layers and Passes in respectively named folders.",
+    "author"     : "Tamir Lousky (Original Author), Luciano Muñoz (added folder creation functionality)",
+    "version"    : (0, 0, 3),
+    "blender"    : (2, 68, 0),
     "category"   : "Render",
     "location"   : "Node Editor >> Tools",
     "wiki_url"   : "https://github.com/Tlousky/production_scripts/wiki/save_all_renderlayers_And_passes.py",
     "tracker_url": "https://github.com/Tlousky/production_scripts/blob/master/save_all_renderlayers_and_passes.py",
-    "description": "Save all render layers and passes to files"
+    "description": "Save all render layers and passes to files in respectively named folders."
 }
 
 import bpy, re
@@ -52,10 +52,13 @@ class save_images(bpy.types.Panel):
     bl_region_type = 'TOOLS'
 
     def draw( self, context) :
+        folder_props = context.scene.folder_props
+
         layout = self.layout
         layout.operator( 'render.create_file_output_nodes' )
+        layout.prop( folder_props, 'create_folders' )
 
-        
+       
 class create_nodes( bpy.types.Operator ):
     """ Create a file output node for each pass in each renderlayer """
     bl_idname      = "render.create_file_output_nodes"
@@ -82,175 +85,43 @@ class create_nodes( bpy.types.Operator ):
 
     def get_layers_and_passes( self, context, basename ):
         rl = context.scene.render.layers
+        use_folders = context.scene.folder_props.create_folders
         
         layers = {}
+
+        pass_attr_str = 'use_pass_'
         
         for l in rl:
             imagebase = basename + "_" + l.name
             layers[l.name] = []
+
+            # List all the attributes of the render layer pass with dir
+            # then isolate all the render pass attributes
+            passes = [ p for p in dir(l) if pass_attr_str in p ]
             
-            if l.use_pass_ambient_occlusion:
-                pass_info = {
-                    'filename' : imagebase + "_" + "AO",
-                    'output'   : 'AO' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_color:
-                pass_info = {
-                    'filename' : imagebase + "_" + "color",
-                    'output'   : 'Color' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_combined:
-                pass_info = {
-                    'filename' : imagebase + "_" + "combined",
-                    'output'   : 'Image' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_diffuse:
-                pass_info = {
-                    'filename' : imagebase + "_" + "diffuse",
-                    'output'   : 'Diffuse' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_diffuse_color:
-                pass_info = {
-                    'filename' : imagebase + "_" + "diffuse_color",
-                    'output'   : 'Diffuse Color' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_diffuse_direct:
-                pass_info = {
-                    'filename' : imagebase + "_" + "diffuse_direct",
-                    'output'   : 'Diffuse Direct' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_diffuse_indirect:
-                pass_info = {
-                    'filename' : imagebase + "_" + "diffuse_indirect",
-                    'output'   : 'Diffuse Indirect' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_emit:
-                pass_info = {
-                    'filename' : imagebase + "_" + "emit",
-                    'output'   : 'Emit' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_environment:
-                pass_info = {
-                    'filename' : imagebase + "_" + "gloss_color",
-                    'output'   : 'Environment' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_glossy_color:
-                pass_info = {
-                    'filename' : imagebase + "_" + "gloss_color",
-                    'output'   : 'Glossy Color' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_glossy_direct:
-                pass_info = {
-                    'filename' : imagebase + "_" + "gloss_direct",
-                    'output'   : 'Glossy Direct' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_glossy_indirect:
-                pass_info = {
-                    'filename' : imagebase + "_" + "gloss_indirect",
-                    'output'   : 'Glossy Indirect' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_indirect:
-                pass_info = {
-                    'filename' : imagebase + "_" + "indirect",
-                    'output'   : 'Indirect' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_material_index:
-                pass_info = {
-                    'filename' : imagebase + "_" + "mat_index",
-                    'output'   : 'IndexMA' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_normal:
-                pass_info = {
-                    'filename' : imagebase + "_" + "normal",
-                    'output'   : 'Normal' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_object_index:
-                pass_info = {
-                    'filename' : imagebase + "_" + "obj_index",
-                    'output'   : 'IndexOB' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_reflection:
-                pass_info = {
-                    'filename' : imagebase + "_" + "reflection",
-                    'output'   : 'Reflect' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_refraction:
-                pass_info = {
-                    'filename' : imagebase + "_" + "refraction",
-                    'output'   : 'Refract' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_shadow:
-                pass_info = {
-                    'filename' : imagebase + "_" + "shadow",
-                    'output'   : 'Shadow' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_specular:
-                pass_info = {
-                    'filename' : imagebase + "_" + "spec",
-                    'output'   : 'Specular' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_transmission_color:
-                pass_info = {
-                    'filename' : imagebase + "_" + "transm",
-                    'output'   : 'Transmission Color' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_transmission_direct:
-                pass_info = {
-                    'filename' : imagebase + "_" + "transm_direct",
-                    'output'   : 'Transmission Direct' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_transmission_indirect:
-                pass_info = {
-                    'filename' : imagebase + "_" + "transm_indirect",
-                    'output'   : 'Transmission Indirect' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_uv:
-                pass_info = {
-                    'filename' : imagebase + "_" + "UV",
-                    'output'   : 'UV', 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_vector:
-                pass_info = {
-                    'filename' : imagebase + "_" + "vector",
-                    'output'   : 'Speed' 
-                }
-                layers[l.name].append( pass_info )
-            if l.use_pass_z:
-                pass_info = {
-                    'filename' : imagebase + "_" + "z",
-                    'output'   : 'Z'
-                }
-                layers[l.name].append( pass_info )
-                
+            for p in passes:
+                # If render pass is active (True) - create output
+                if getattr( l, p ):
+                    pass_name = p[len(pass_attr_str):]
+
+                    if use_folders:
+                        # Distribute into subfolders for each layer and pass
+                        # Example: Scene/RenderLayer/ambient_occlusion/...
+                        file_path = context.scene.name + "/" + l.name + "/" + \
+                                    pass_name + "/" + l.name + "_" + pass_name
+                    else:
+                        file_path = imagebase + "_" + pass_name
+                    pass_info = {
+                        'filename' : file_path,
+                        'output'   : pass_name
+                    }
+                    layers[l.name].append( pass_info )
+            
         return layers
 
     def execute( self, context):
-        basename = self.find_base_name()
-        layers   = self.get_layers_and_passes( context, basename )
+        basename    = self.find_base_name()
+        layers      = self.get_layers_and_passes( context, basename )
 
         # create references to node tree and node links
         tree  = bpy.context.scene.node_tree
@@ -275,6 +146,18 @@ class create_nodes( bpy.types.Operator ):
             },
         }
         
+        # Renderlayer pass names and renderlayer node output names do not match
+        # which is why we're using this dictionary (and some regular expressions
+        # later to match the two)
+        output_dict = {
+            'ambient_occlusion' : 'AO',
+            'material_index'    : 'IndexMA',
+            'object_index'      : 'IndexOB',
+            'reflection'        : 'Reflect',
+            'refraction'        : 'Refract',
+            'combined'          : 'Image'
+        }
+
         # Get blender version
         version = bpy.app.version[1]
 
@@ -323,9 +206,21 @@ class create_nodes( bpy.types.Operator ):
                 output_node.file_slots[0].path = rpass['filename']
                 output_node.base_path          = context.scene.render.filepath
 
+                output  = ''
+                passout = rpass['output']
+
+                if passout in output_dict.keys():
+                    output = output_dict[ passout ]
+                elif "_" in passout:
+                    wl = passout.split("_") # Split to list of words
+                    # Capitalize first char in each word and rejoin with spaces
+                    output = " ".join( s[0].capitalize() + s[1:] for s in wl )
+                else: # If one word, just capitlaize first letter
+                    output = passout[0].capitalize() + passout[1:]
+
                 # Set up links
-                output = rpass['output']
-                links.new( node.outputs[ output ], output_node.inputs[0] )
+                if output:
+                    links.new( node.outputs[ output ], output_node.inputs[0] )
 
                 output_number += 1
                 
@@ -342,10 +237,19 @@ class create_nodes( bpy.types.Operator ):
         links.new( node.outputs[ 'Image' ], cnode.inputs[0] )
         
         return {'FINISHED'}
-            
+
+class folder_options( bpy.types.PropertyGroup ):
+    create_folders = bpy.props.BoolProperty(
+        description = "Create a folder for each render pass",
+        name        = "Create Folders",
+        default     = True
+    )
 
 def register():
     bpy.utils.register_module(__name__)
+    bpy.types.Scene.folder_props = bpy.props.PointerProperty( 
+        type = folder_options
+    )
     
 def unregister():
     bpy.utils.unregister_module(__name__)

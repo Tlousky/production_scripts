@@ -27,22 +27,6 @@
 #  ================
 #  Nathan Elias (for suggesting the idea)
 
-# Fake HDR
-
-# User:
-# 0.  Choose an HDR image file
-# Script:
-# 1. Create a polysphere
-# 2. UV unwrap with spherical projection
-# 3. Create shadeless material
-# 4. Bake texture to vertex color
-# 5. Create a hair particle system with a particle per vert
-# 6. Use lamp instances for particles, then make them real and single users
-# 7. Iterate over vertex colors, map each to the corresponding lamp
-# 8. Delete the original sphere
-# 9. Parent all lamps to a spherical empty for easy transformation and scaling
-# That's it!
-
 bl_info = {    
     "name"       : "Fake HDR",
     "author"     : "Tamir Lousky",
@@ -50,8 +34,8 @@ bl_info = {
     "blender"    : (2, 68, 0),
     "category"   : "Render",
     "location"   : "3D View >> Tools",
-    "wiki_url"   : "",
-    "tracker_url": "",
+    "wiki_url"   : "https://github.com/Tlousky/production_scripts/wiki/Fake-HDR",
+    "tracker_url": "https://github.com/Tlousky/production_scripts/blob/master/fake_hdr.py",
     "description": "Create an array of stops that mimicks an HDR image"
 }
 

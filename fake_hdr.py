@@ -58,11 +58,11 @@ class fake_hdr(bpy.types.Panel):
         return context.scene.render.engine == 'BLENDER_RENDER'
 
     def draw( self, context) :
-        hdr_image = context.scene.fake_hdr_image
+        # hdr_image = context.scene.fake_hdr_image
         props     = context.scene.fake_hdr_props
 
         layout = self.layout
-        col    = layout.col
+        col    = layout.column()
 
         col.prop_search(          
             context.scene, "fake_hdr_image",  # Pick HDR image 
@@ -88,7 +88,11 @@ class create_hdr_sphere( bpy.types.Operator ):
     def create_sphere( self, context, subd ):
         bm = bmesh.new()
         # Create new icosphere mesh
-        sphere_verts = bmesh.ops.create_icosphere( bm, subdivisions = subd )
+        sphere_verts = bmesh.ops.create_icosphere( 
+            bm, 
+            subdivisions = subd,
+            diameter = 1
+         )
 
         # Create new mesh from bmesh
         me = bpy.data.meshes.new("LightSphere")
@@ -107,13 +111,14 @@ class create_hdr_sphere( bpy.types.Operator ):
         obj.select = True
 
         # Go to edit mode
-        obj.mode = 'EDIT'
+        bpy.ops.object.mode_set(mode ='EDIT')
 
         # Create spherical UV map
+        bpy.ops.mesh.select_all( action = 'SELECT' )
         bpy.ops.uv.sphere_project()
 
         # Return to object mode
-        obj.mode = 'OBJECT'
+        bpy.ops.object.mode_set(mode ='OBJECT')
 
         # Add material slot to object
         bpy.ops.object.material_slot_add()
@@ -125,17 +130,16 @@ class create_hdr_sphere( bpy.types.Operator ):
         mat.use_shadeless = True
 
         # Set material as active on object
-        C.object.material_slots[0].material = mat
+        context.object.material_slots[0].material = mat
         
         # Create a new texture and set it up
         bpy.data.textures.new( name = 'FakeHDR.Texture', type = 'IMAGE' )
         tex       = bpy.data.textures[-1]
-        tex.image = context.scene.fake_hdr_image
+        tex.image = bpy.data.images[ context.scene.fake_hdr_image ]
 
         # Add material texture slot and set it up
         mat.texture_slots.add()
-        mat.texture_slots[0].name           = 'FakeHDR'
-        mat.texture_slots[0].texture.coords = 'UV'      # Map texture to UVs
+        mat.texture_slots[0].texture_coords = 'UV'      # Map texture to UVs
         mat.texture_slots[0].texture        = tex
 
     def bake_textures_to_verts( self, context, obj ):
@@ -146,8 +150,8 @@ class create_hdr_sphere( bpy.types.Operator ):
         # Set up bake textures to vert colors
         if not context.scene.render.use_bake_to_vertex_color:
             context.scene.render.use_bake_to_vertex_color = True
-        if not scene.render.bake_type == 'TEXTURE':
-            scene.render.bake_type = 'TEXTURE'
+        if not context.scene.render.bake_type == 'TEXTURE':
+            context.scene.render.bake_type = 'TEXTURE'
 
         # Add vertex color map
         bpy.ops.mesh.vertex_color_add()
@@ -202,6 +206,7 @@ class create_hdr_sphere( bpy.types.Operator ):
         bpy.ops.object.duplicates_make_real()
 
         # Delete (now useless) original lamp
+        bpy.ops.object.select_all( action = 'DESELECT' )
         lampobj.select = True
         bpy.ops.object.delete()
 
@@ -243,6 +248,7 @@ class create_hdr_sphere( bpy.types.Operator ):
         lamps = self.create_lamps( context, obj )
         self.color_lamps( context, obj, lamps )
 
+        return {'FINISHED'}
 
 class fake_HDR_props( bpy.types.PropertyGroup ):
     sphere_resolution = bpy.props.IntProperty(
@@ -254,8 +260,9 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.Scene.fake_hdr_props = bpy.props.PointerProperty( 
-        type = 'fake_HDR_props'
+        type = fake_HDR_props
     )
+    bpy.types.Scene.fake_hdr_image = bpy.props.StringProperty()
     
 def unregister():
     bpy.utils.unregister_module(__name__)

@@ -26,6 +26,8 @@
 #  Acknowledgements 
 #  ================
 #  Nathan Elias (for suggesting the idea)
+#  Zeffii @ StackExchange - for providing really useful insights and sample code 
+#                           on how vertex colors can be matched with mesh verts.
 
 bl_info = {    
     "name"       : "Fake HDR",
@@ -40,11 +42,24 @@ bl_info = {
 }
 
 import bpy, re, bmesh
+from collections import defaultdict
+from mathutils   import Color
 
 def check_poll_conditions( context ):
     hdr_image_selected = context.scene.fake_hdr_image
     rend_engine_is_bi  = context.scene.render.engine == 'BLENDER_RENDER'
     return hdr_image_selected and rend_engine_is_bi
+
+def change_light_intensity( obj, intensity ):
+    """ Change the light intensity of a lamp. Uses the correct methods to 
+    affect both cycles and BI lamps """
+    if bpy.context.scene.render.engine == 'CYCLES':
+        if not obj.data.use_nodes:
+            obj.data.use_nodes = True
+        strength = obj.data.node_tree.nodes['Emission'].inputs['Strength']
+        strength.default_value = intensity
+    else:
+        obj.data.energy = intensity
 
 class fake_hdr(bpy.types.Panel):
     bl_idname      = "FakeHDR"
@@ -73,7 +88,18 @@ class fake_hdr(bpy.types.Panel):
 
         layout.operator( 'render.create_hdr_sphere' )
 
+        lbl   = layout.label( "Update light array intensity and softness" )
+        frame = layout.frame()
+        col   = frame.column()
+        lbl   = col.label( "Choose control sphere to update" )
 
+        # Only draw these properties if the empty is selected
+        if 'lamp_intensity' in dir( context.object ):
+            col.prop( context.object, 'lamp_intensity' )
+        if 'lamp_size' in dir( context.object ):
+            col.prop( context.object, 'lamp_size' )
+        
+        
 class create_hdr_sphere( bpy.types.Operator ):
     """ Create a file output node for each pass in each renderlayer """
     bl_idname      = "render.create_hdr_sphere"
@@ -215,15 +241,22 @@ class create_hdr_sphere( bpy.types.Operator ):
 
         # Create empty which will act as the lamps' parent object
         bpy.ops.object.empty_add( type = 'SPHERE' )
-        empty = bpy.context.scene.objects[ bpy.context.object.name ]
+        empty      = bpy.context.scene.objects[ bpy.context.object.name ]
+        emtpy.name = 'FakeHDR.LightArray.Control'
 
         # Deselect all objects
         bpy.ops.object.select_all( action = 'DESELECT' )
 
-        # Select all lamps and parent all to empty
+        # Select all lamps, parent all to empty and add damped track constraints
         for lamp in lamps:
             lamp.select = True
             lamp.parent = empty
+
+            # Create damped track constraint from lamp to empty to make sure
+            # spots always look in the direction of the empty
+            const = lamp.constraints.new(type='DAMPED_TRACK')
+            const.target     = empty
+            const.track_axis = 'TRACK_NEGATIVE_Z'
 
         # Make all lamp instances single users (to enable separate control
         # over their properties)
@@ -232,13 +265,39 @@ class create_hdr_sphere( bpy.types.Operator ):
             object = True, 
             obdata = True
         )
+
+        # Create custom properties on empty
+        props = context.scene.fake_hdr_props
+        empty.lamp_size      = props.lamp_size
+        empty.lamp_intensity = props.lamp_intensity
+        empty.lamp_type      = props.lamp_type
         
         return lamps
 
     def color_lamps( self, context, obj, lamps ):
-        vcolor_points = obj.data.vertex_colors[0].data
-        for c,l in zip( [ v.color for v in vcolor_points ], lamps ):
-            l.data.color = c
+        vcolor_dict = defaultdict(list)
+        mesh        = obj.data
+        color_layer = obj.data.vertex_colors[0]
+
+        i = 0
+        for poly in mesh.polygons:
+            for idx in poly.loop_indices:
+                loop  = mesh.loops[idx]
+                color = color_layer.data[i].color
+                vcolor_dict[loop.vertex_index].append(color)
+                i += 1
+
+        avg_vcolors = {}
+        for v in vcolor_dict:
+            avg_vcolors[ v ] = Color( (
+                sum( [ c.r for c in vcolor_dict[v] ] ) / len( vcolor_dict[v] ),
+                sum( [ c.g for c in vcolor_dict[v] ] ) / len( vcolor_dict[v] ),
+                sum( [ c.b for c in vcolor_dict[v] ] ) / len( vcolor_dict[v] ),
+            ) )
+
+        for v in avg_vcolors:
+            lamp = [ l for l in lamp if l.location == mesh[v].co ]
+            lamp.data.color = avg_vcolors[v]
 
     def execute( self, context ):
         subd = context.scene.fake_hdr_props.sphere_resolution
@@ -251,11 +310,55 @@ class create_hdr_sphere( bpy.types.Operator ):
         return {'FINISHED'}
 
 class fake_HDR_props( bpy.types.PropertyGroup ):
+    def update_intensity( self, context ):
+        empty = context.scene.objects['FakeHDR.LightArray.Control']
+        value = empty.lamp_intensity
+
+        for l in empty.children:
+            change_light_intensity( l, value )
+
+    def update_size( self, context ):
+        empty = context.scene.objects['FakeHDR.LightArray.Control']
+        value = empty.lamp_size
+        
+        for l in empty.children:
+            l.data.shadow_soft_size = value
+
+    def update_type( self, context ):
+        empty = context.scene.objects['FakeHDR.LightArray.Control']
+        value = empty.lamp_type
+
+        for l in empty.children:
+            l.data.type = str(value).capitalize()
+
     sphere_resolution = bpy.props.IntProperty(
         description = "Light sphere subdivisions",
         name        = "Sphere Resolutionss",
         default     = 1
     )
+
+    types = [('point', 'point', ''), ('spot', 'spot', '')]
+    lamp_type = bpy.props.EnumProperty(
+        name    = "Material distribution method",
+        items   = types, 
+        default = 'spot',
+        update  = update_type
+    )
+
+    lamp_intensity = bpy.props.FloatProperty(
+        name        = "lamp_intensity",
+        description = "Size (and softness of shadows) of the array's lamps",
+        default     = 1.0,
+        update      = update_intensity
+    )
+
+    lamp_size = bpy.props.FloatProperty(
+        name        = "lamp_size",
+        description = "Size (and softness of shadows) of the array's lamps",
+        default     = 1.0,
+        update      = update_size
+    )
+
 
 def register():
     bpy.utils.register_module(__name__)

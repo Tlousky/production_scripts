@@ -70,7 +70,8 @@ class fake_hdr(bpy.types.Panel):
 
     @classmethod
     def poll( self, context ):
-        return context.scene.render.engine == 'BLENDER_RENDER'
+        return True
+        # return context.scene.render.engine == 'BLENDER_RENDER'
 
     def draw( self, context) :
         # hdr_image = context.scene.fake_hdr_image
@@ -88,17 +89,15 @@ class fake_hdr(bpy.types.Panel):
 
         layout.operator( 'render.create_hdr_sphere' )
 
-        lbl   = layout.label( "Update light array intensity and softness" )
-        frame = layout.frame()
-        col   = frame.column()
-        lbl   = col.label( "Choose control sphere to update" )
+        lbl = layout.label( "Update light array intensity and softness" )
+        box = layout.box()
+        col = box.column()
+        lbl = col.label( "Choose control sphere to update" )
 
-        # Only draw these properties if the empty is selected
-        if 'lamp_intensity' in dir( context.object ):
-            col.prop( context.object, 'lamp_intensity' )
-        if 'lamp_size' in dir( context.object ):
-            col.prop( context.object, 'lamp_size' )
-        
+        col.prop( context.scene.fake_hdr_props, 'lamp_type'      )
+        col.prop( context.scene.fake_hdr_props, 'lamp_intensity' )
+        col.prop( context.scene.fake_hdr_props, 'lamp_size'      )
+
         
 class create_hdr_sphere( bpy.types.Operator ):
     """ Create a file output node for each pass in each renderlayer """
@@ -242,7 +241,7 @@ class create_hdr_sphere( bpy.types.Operator ):
         # Create empty which will act as the lamps' parent object
         bpy.ops.object.empty_add( type = 'SPHERE' )
         empty      = bpy.context.scene.objects[ bpy.context.object.name ]
-        emtpy.name = 'FakeHDR.LightArray.Control'
+        empty.name = 'FakeHDR.LightArray.Control'
 
         # Deselect all objects
         bpy.ops.object.select_all( action = 'DESELECT' )
@@ -266,12 +265,6 @@ class create_hdr_sphere( bpy.types.Operator ):
             obdata = True
         )
 
-        # Create custom properties on empty
-        props = context.scene.fake_hdr_props
-        empty.lamp_size      = props.lamp_size
-        empty.lamp_intensity = props.lamp_intensity
-        empty.lamp_type      = props.lamp_type
-        
         return lamps
 
     def color_lamps( self, context, obj, lamps ):
@@ -295,8 +288,9 @@ class create_hdr_sphere( bpy.types.Operator ):
                 sum( [ c.b for c in vcolor_dict[v] ] ) / len( vcolor_dict[v] ),
             ) )
 
+        verts = mesh.vertices
         for v in avg_vcolors:
-            lamp = [ l for l in lamp if l.location == mesh[v].co ]
+            lamp = [ l for l in lamps if l.location == verts[v].co ][0]
             lamp.data.color = avg_vcolors[v]
 
     def execute( self, context ):
@@ -312,24 +306,24 @@ class create_hdr_sphere( bpy.types.Operator ):
 class fake_HDR_props( bpy.types.PropertyGroup ):
     def update_intensity( self, context ):
         empty = context.scene.objects['FakeHDR.LightArray.Control']
-        value = empty.lamp_intensity
+        value = context.scene.fake_hdr_props.lamp_intensity
 
         for l in empty.children:
             change_light_intensity( l, value )
 
     def update_size( self, context ):
         empty = context.scene.objects['FakeHDR.LightArray.Control']
-        value = empty.lamp_size
+        value = context.scene.fake_hdr_props.lamp_size
         
         for l in empty.children:
             l.data.shadow_soft_size = value
 
     def update_type( self, context ):
         empty = context.scene.objects['FakeHDR.LightArray.Control']
-        value = empty.lamp_type
+        value = context.scene.fake_hdr_props.lamp_type
 
         for l in empty.children:
-            l.data.type = str(value).capitalize()
+            l.data.type = str(value).upper()
 
     sphere_resolution = bpy.props.IntProperty(
         description = "Light sphere subdivisions",

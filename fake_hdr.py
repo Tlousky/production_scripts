@@ -19,13 +19,14 @@
 #
 #  Author            : Tamir Lousky [ tlousky@gmail.com, tamir@pitchipoy.tv ]
 #  Homepage(Wiki)    : http://bioblog3d.wordpress.com/
-# 
+#  Studio (sponsor)  : PitchiPoy Animation Productions (PitchiPoy.tv)
 #  Start of project              : 2013-11-08 by Tamir Lousky
-#  Last modified                 : 2013-11-08
+#  Last modified                 : 2013-13-08
 #
 #  Acknowledgements 
 #  ================
-#  Nathan Elias (for suggesting the idea)
+#  PitchiPoy: Nathan Elias    (for suggesting the idea)
+#             Dima Kondrashov (for feature suggestions and testing)
 #  Zeffii @ StackExchange - for providing really useful insights and sample code 
 #                           on how vertex colors can be matched with mesh verts.
 
@@ -89,19 +90,29 @@ class fake_hdr(bpy.types.Panel):
 
         layout.operator( 'render.create_hdr_sphere' )
 
-        lbl = layout.label( "Update lamp properties" )
-        box = layout.box()
-        col = box.column()
+        if 'FakeHDR.LightArray.Control' in context.scene.objects:
+            lbl = layout.label( "Update lamp properties" )
+            box = layout.box()
+            col = box.column()
 
-        col.prop( context.scene.fake_hdr_props, 'lamp_type'         )
-        col.prop( context.scene.fake_hdr_props, 'lamp_intensity'    )
-        col.prop( context.scene.fake_hdr_props, 'lamp_shadow_type'  )
-        col.prop( context.scene.fake_hdr_props, 'lamp_use_specular' )
-        
-        if props.lamp_shadow_type == 'RAY_SHADOW':
-            col.prop( context.scene.fake_hdr_props, 'lamp_ray_samples' )
+            col.prop( context.scene.fake_hdr_props, 'lamp_type'         )
+            col.prop( context.scene.fake_hdr_props, 'lamp_intensity'    )
+            col.prop( context.scene.fake_hdr_props, 'lamp_distance'     )
+            col.prop( context.scene.fake_hdr_props, 'lamp_shadow_type'  )
+            col.prop( context.scene.fake_hdr_props, 'lamp_use_specular' )
+            
+            if props.lamp_shadow_type == 'RAY_SHADOW':
+                col.prop( context.scene.fake_hdr_props, 'lamp_ray_samples' )
 
-        col.prop( context.scene.fake_hdr_props, 'lamp_size' )
+            col.prop( context.scene.fake_hdr_props, 'lamp_size' )
+
+            lbl = layout.label( "Make sun lamp of strongest light" )
+            box = layout.box()
+            col = box.column()
+            
+            col.prop( context.scene.fake_hdr_props, 'use_sun' )
+            if context.scene.fake_hdr_props.use_sun:
+                col.prop( context.scene.fake_hdr_props, 'sun_intensity' )
         
 class create_hdr_sphere( bpy.types.Operator ):
     """ Create a file output node for each pass in each renderlayer """
@@ -179,10 +190,8 @@ class create_hdr_sphere( bpy.types.Operator ):
         obj.select = True
 
         # Set up bake textures to vert colors
-        if not context.scene.render.use_bake_to_vertex_color:
-            context.scene.render.use_bake_to_vertex_color = True
-        if not context.scene.render.bake_type == 'TEXTURE':
-            context.scene.render.bake_type = 'TEXTURE'
+        context.scene.render.use_bake_to_vertex_color = True
+        context.scene.render.bake_type                = 'TEXTURE'
 
         # Add vertex color map
         bpy.ops.mesh.vertex_color_add()
@@ -222,7 +231,7 @@ class create_hdr_sphere( bpy.types.Operator ):
         )
 
         # Reference lamp
-        lampobj = bpy.context.scene.objects[ bpy.context.object.name ]
+        lampobj      = bpy.context.scene.objects[ bpy.context.object.name ]
         lampname     = 'fake_hdr_lamp'
         lampobj.name = lampname
 
@@ -238,8 +247,10 @@ class create_hdr_sphere( bpy.types.Operator ):
 
         # Delete (now useless) original lamp
         bpy.ops.object.select_all( action = 'DESELECT' )
-        lampobj.select = True
+        lampobj.select               = True
+        context.scene.objects.active = lampobj
         bpy.ops.object.delete()
+        context.scene.objects.unlink( lampobj )
 
         # Reference all lamps
         lamps = [ o for o in bpy.context.scene.objects if lampname in o.name ]
@@ -311,6 +322,22 @@ class create_hdr_sphere( bpy.types.Operator ):
             lamp = [ l for l in lamps if l.location == verts[v].co ][0]
             lamp.data.color = avg_vcolors[v]
 
+        # If the user opted to set the strongest light as a sun lamp
+        # Then find the strongest light and change its type to Sun lamp
+        if context.scene.fake_hdr_props.use_sun:
+            intensities = { # Summarize rgb to get intensity
+                v : sum( [ c for c in avg_vcolors[v] ] ) for v in avg_vcolors 
+            }
+        
+            max_lightint = max( intensities.values() ) # Find highest intensity
+            for v,i in intensities.items():
+                if i == max_lightint:
+                    lamp = [ l for l in lamps if l.location == verts[v].co ][0]
+                    lamp.data.type = 'SUN'
+                    value = context.scene.fake_hdr_props.sun_intensity
+                    change_light_intensity( lamp, value )
+                    break # Make sure than no more than one sun exists
+
     def execute( self, context ):
         subd = context.scene.fake_hdr_props.sphere_resolution
         obj  = self.create_sphere( context, subd )
@@ -321,15 +348,20 @@ class create_hdr_sphere( bpy.types.Operator ):
 
         return {'FINISHED'}
 
+
 class fake_HDR_props( bpy.types.PropertyGroup ):
     def find_lamps( self, context ):
         empty = context.scene.objects['FakeHDR.LightArray.Control']
         return [ c for c in empty.children if c.type == 'LAMP' ]   
 
     def update_intensity( self, context ):
-        value = context.scene.fake_hdr_props.lamp_intensity
+        value  = context.scene.fake_hdr_props.lamp_intensity
+        svalue = context.scene.fake_hdr_props.sun_intensity
         for l in self.find_lamps(context):
-            change_light_intensity( l, value )
+            if l.data.type != 'SUN':
+                change_light_intensity( l, value )
+            else:
+                change_light_intensity( l, svalue )
 
     def update_size( self, context ):
         for l in self.find_lamps(context):
@@ -337,7 +369,8 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
 
     def update_type( self, context ):
         for l in self.find_lamps(context):
-            l.data.type = context.scene.fake_hdr_props.lamp_type
+            if l.data.type != 'SUN':
+                l.data.type = context.scene.fake_hdr_props.lamp_type
 
     def update_distance( self, context ):
         for l in self.find_lamps(context):
@@ -357,9 +390,40 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         for l in self.find_lamps(context):
             l.data.shadow_ray_samples = value
 
+    def update_use_sun( self, context ):
+        lamps      = self.find_lamps(context)
+        sun_exists = 'SUN' in [ l.data.type for l in lamps ]
+        use_sun    = context.scene.fake_hdr_props.use_sun
+
+        if not use_sun:
+            if sun_exists:
+                default_type = context.scene.fake_hdr_props.lamp_type
+                default_int  = context.scene.fake_hdr_props.lamp_intensity
+
+                for l in lamps:
+                    if l.data.type == 'SUN':
+                        l.data.type = default_type
+                        change_light_intensity( l, default_int )
+
+        else:
+            intensities = {          # Summarize rgb to get intensity
+                l : sum( [ c for c in l.data.color ] ) for l in lamps
+            }
+        
+            max_lightint = max( intensities.values() ) # Find highest intensity
+
+            for l,i in intensities.items():
+                if i == max_lightint:
+                    l.data.type = 'SUN'
+
+                    value = context.scene.fake_hdr_props.sun_intensity
+                    change_light_intensity( l, value )
+
+                    break # Make sure than no more than one sun exists
+
     sphere_resolution = bpy.props.IntProperty(
         description = "Light sphere subdivisions",
-        name        = "Sphere Resolutionss",
+        name        = "Sphere Resolution",
         default     = 1
     )
 
@@ -372,28 +436,28 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
     )
 
     lamp_intensity = bpy.props.FloatProperty(
-        name        = "lamp_intensity",
+        name        = "Lamp light intensity",
         description = "Size (and softness of shadows) of the array's lamps",
         default     = 1.0,
         update      = update_intensity
     )
 
     lamp_size = bpy.props.FloatProperty(
-        name        = "lamp_size",
+        name        = "Lamp shadow size",
         description = "Size (and softness of shadows) of the array's lamps",
         default     = 1.0,
         update      = update_size
     )
 
     lamp_distance = bpy.props.FloatProperty(
-        name        = "lamp_distance",
+        name        = "Lamp distance",
         description = "Distance (affects intensity due to falloff)",
         default     = 25.0,
         update      = update_distance
     )
 
     lamp_use_specular = bpy.props.BoolProperty(
-        name        = "lamp_use_specular",
+        name        = "Use specular",
         description = "If true - lamps create specular highlights",
         default     = True,
         update      = update_use_specular
@@ -401,18 +465,33 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
 
     shadow_types = [('NOSHADOW', 'No Shadow', ''), ('RAY_SHADOW', 'Ray Shadow', '')]
     lamp_shadow_type = bpy.props.EnumProperty(
-        name    = "Type of shadow to use",
+        name    = "Shadow type",
         items   = shadow_types, 
         default = 'NOSHADOW',
         update  = update_shadow_type
     )
 
     lamp_ray_samples = bpy.props.IntProperty(
-        name        = "lamp_ray_samples",
+        name        = "Ray shadow samples",
         description = "Number of ray shadow samples (i.e. quality)",
         default     = 5,
         update      = update_ray_samples
     )
+
+    use_sun = bpy.props.BoolProperty(
+        name        = "Create sun",
+        description = "Make strongest light a sun lamp",
+        default     = True,
+        update      = update_use_sun
+    )
+
+    sun_intensity = bpy.props.FloatProperty(
+        name        = "Sun intensity",
+        description = "The intensity of the sun lamp",
+        default     = 5.0,
+        update      = update_intensity
+    )
+
 
 
 def register():

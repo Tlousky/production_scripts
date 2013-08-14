@@ -94,10 +94,15 @@ class fake_hdr(bpy.types.Panel):
         col = box.column()
         lbl = col.label( "Choose control sphere to update" )
 
-        col.prop( context.scene.fake_hdr_props, 'lamp_type'      )
-        col.prop( context.scene.fake_hdr_props, 'lamp_intensity' )
-        col.prop( context.scene.fake_hdr_props, 'lamp_size'      )
+        col.prop( context.scene.fake_hdr_props, 'lamp_type'         )
+        col.prop( context.scene.fake_hdr_props, 'lamp_intensity'    )
+        col.prop( context.scene.fake_hdr_props, 'lamp_shadow_type'  )
+        col.prop( context.scene.fake_hdr_props, 'lamp_use_specular' )
+        
+        if props.lamp_shadow_type == 'RAY_SHADOW':
+            col.prop( context.scene.fake_hdr_props, 'lamp_ray_samples' )
 
+        col.prop( context.scene.fake_hdr_props, 'lamp_size'        )
         
 class create_hdr_sphere( bpy.types.Operator ):
     """ Create a file output node for each pass in each renderlayer """
@@ -248,7 +253,19 @@ class create_hdr_sphere( bpy.types.Operator ):
         # Deselect all objects
         bpy.ops.object.select_all( action = 'DESELECT' )
 
+        # Set empty as the sphere's parent
+        obj.parent = empty
+        
+        # Make sphere unrendereable and remove its particle system
+        obj.hide_render = True
+
+        context.scene.objects.active = obj
+        obj.select = True
+        
+        bpy.ops.object.particle_system_remove()        
+        
         # Select all lamps, parent all to empty and add damped track constraints
+        bpy.ops.object.select_all( action = 'DESELECT' )
         for lamp in lamps:
             lamp.select = True
             lamp.parent = empty
@@ -306,26 +323,40 @@ class create_hdr_sphere( bpy.types.Operator ):
         return {'FINISHED'}
 
 class fake_HDR_props( bpy.types.PropertyGroup ):
-    def update_intensity( self, context ):
+    def find_lamps( self, context ):
         empty = context.scene.objects['FakeHDR.LightArray.Control']
-        value = context.scene.fake_hdr_props.lamp_intensity
+        return [ c for c in empty.children if c.type == 'LAMP' ]   
 
-        for l in empty.children:
+    def update_intensity( self, context ):
+        value = context.scene.fake_hdr_props.lamp_intensity
+        for l in find_lamps():
             change_light_intensity( l, value )
 
     def update_size( self, context ):
-        empty = context.scene.objects['FakeHDR.LightArray.Control']
-        value = context.scene.fake_hdr_props.lamp_size
-        
-        for l in empty.children:
-            l.data.shadow_soft_size = value
+        for l in find_lamps():
+            l.data.shadow_soft_size = context.scene.fake_hdr_props.lamp_size
 
     def update_type( self, context ):
-        empty = context.scene.objects['FakeHDR.LightArray.Control']
-        value = context.scene.fake_hdr_props.lamp_type
+        for l in find_lamps():
+            l.data.type = str(context.scene.fake_hdr_props.lamp_type).upper()
 
-        for l in empty.children:
-            l.data.type = str(value).upper()
+    def update_distance( self, context ):
+        for l in find_lamps():
+            l.data.distance = context.scene.fake_hdr_props.lamp_distance
+
+    def update_use_specular( self, context ):
+        for l in find_lamps():
+            l.data.use_specular = context.scene.fake_hdr_props.lamp_use_specular
+
+    def update_shadow_type( self, context ):
+        value = context.scene.fake_hdr_props.lamp_shadow_type
+        for l in find_lamps():
+            l.data.shadow_method = value
+
+    def update_ray_samples( self, context ):
+        value = context.scene.fake_hdr_props.lamp_ray_samples
+        for l in find_lamps():
+            l.data.shadow_ray_samples = value
 
     sphere_resolution = bpy.props.IntProperty(
         description = "Light sphere subdivisions",
@@ -353,6 +384,35 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         description = "Size (and softness of shadows) of the array's lamps",
         default     = 1.0,
         update      = update_size
+    )
+
+    lamp_distance = bpy.props.FloatProperty(
+        name        = "lamp_distance",
+        description = "Distance (affects intensity due to falloff)",
+        default     = 25.0,
+        update      = update_distance
+    )
+
+    lamp_use_specular = bpy.props.BoolProperty(
+        name        = "lamp_use_specular",
+        description = "If true - lamps create specular highlights",
+        default     = True,
+        update      = update_use_specular
+    )
+
+    shadow_types = [('NOSHADOW', 'No Shadow', ''), ('NOSHADOW', 'Ray Shadow', '')]
+    lamp_shadow_type = bpy.props.EnumProperty(
+        name    = "Type of shadow to use",
+        items   = shadow_types, 
+        default = 'NOSHADOW',
+        update  = update_shadow_type
+    )
+
+    lamp_ray_samples = bpy.props.IntProperty(
+        name        = "lamp_ray_samples",
+        description = "Number of ray shadow samples (i.e. quality)",
+        default     = 5,
+        update      = update_ray_samples
     )
 
 

@@ -89,10 +89,9 @@ class fake_hdr(bpy.types.Panel):
 
         layout.operator( 'render.create_hdr_sphere' )
 
-        lbl = layout.label( "Update light array intensity and softness" )
+        lbl = layout.label( "Update lamp properties" )
         box = layout.box()
         col = box.column()
-        lbl = col.label( "Choose control sphere to update" )
 
         col.prop( context.scene.fake_hdr_props, 'lamp_type'         )
         col.prop( context.scene.fake_hdr_props, 'lamp_intensity'    )
@@ -102,7 +101,7 @@ class fake_hdr(bpy.types.Panel):
         if props.lamp_shadow_type == 'RAY_SHADOW':
             col.prop( context.scene.fake_hdr_props, 'lamp_ray_samples' )
 
-        col.prop( context.scene.fake_hdr_props, 'lamp_size'        )
+        col.prop( context.scene.fake_hdr_props, 'lamp_size' )
         
 class create_hdr_sphere( bpy.types.Operator ):
     """ Create a file output node for each pass in each renderlayer """
@@ -329,33 +328,33 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
 
     def update_intensity( self, context ):
         value = context.scene.fake_hdr_props.lamp_intensity
-        for l in find_lamps():
+        for l in self.find_lamps(context):
             change_light_intensity( l, value )
 
     def update_size( self, context ):
-        for l in find_lamps():
+        for l in self.find_lamps(context):
             l.data.shadow_soft_size = context.scene.fake_hdr_props.lamp_size
 
     def update_type( self, context ):
-        for l in find_lamps():
-            l.data.type = str(context.scene.fake_hdr_props.lamp_type).upper()
+        for l in self.find_lamps(context):
+            l.data.type = context.scene.fake_hdr_props.lamp_type
 
     def update_distance( self, context ):
-        for l in find_lamps():
+        for l in self.find_lamps(context):
             l.data.distance = context.scene.fake_hdr_props.lamp_distance
 
     def update_use_specular( self, context ):
-        for l in find_lamps():
+        for l in self.find_lamps(context):
             l.data.use_specular = context.scene.fake_hdr_props.lamp_use_specular
 
     def update_shadow_type( self, context ):
         value = context.scene.fake_hdr_props.lamp_shadow_type
-        for l in find_lamps():
+        for l in self.find_lamps(context):
             l.data.shadow_method = value
 
     def update_ray_samples( self, context ):
         value = context.scene.fake_hdr_props.lamp_ray_samples
-        for l in find_lamps():
+        for l in self.find_lamps(context):
             l.data.shadow_ray_samples = value
 
     sphere_resolution = bpy.props.IntProperty(
@@ -364,11 +363,11 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         default     = 1
     )
 
-    types = [('point', 'point', ''), ('spot', 'spot', '')]
+    types = [('POINT', 'point', ''), ('SPOT', 'spot', '')]
     lamp_type = bpy.props.EnumProperty(
-        name    = "Material distribution method",
+        name    = "Lamp Type",
         items   = types, 
-        default = 'spot',
+        default = 'SPOT',
         update  = update_type
     )
 
@@ -400,7 +399,7 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         update      = update_use_specular
     )
 
-    shadow_types = [('NOSHADOW', 'No Shadow', ''), ('NOSHADOW', 'Ray Shadow', '')]
+    shadow_types = [('NOSHADOW', 'No Shadow', ''), ('RAY_SHADOW', 'Ray Shadow', '')]
     lamp_shadow_type = bpy.props.EnumProperty(
         name    = "Type of shadow to use",
         items   = shadow_types, 

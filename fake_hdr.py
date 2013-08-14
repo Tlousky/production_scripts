@@ -286,6 +286,13 @@ class create_hdr_sphere( bpy.types.Operator ):
             const.target     = empty
             const.track_axis = 'TRACK_NEGATIVE_Z'
 
+            # Set all default parameters
+            props = context.scene.fake_hdr_props
+            lamp.data.distance           = props.lamp_distance
+            lamp.data.shadow_ray_samples = props.lamp_ray_samples
+            lamp.data.shadow_soft_size   = props.lamp_size
+            lamp.data.use_specular       = props.lamp_use_specular
+
         # Make all lamp instances single users (to enable separate control
         # over their properties)
         bpy.ops.object.make_single_user(

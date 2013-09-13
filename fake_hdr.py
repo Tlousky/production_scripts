@@ -21,7 +21,7 @@
 #  Homepage(Wiki)    : http://bioblog3d.wordpress.com/
 #  Studio (sponsor)  : PitchiPoy Animation Productions (PitchiPoy.tv)
 #  Start of project  : 2013-11-08 by Tamir Lousky
-#  Last modified     : 2013-12-09
+#  Last modified     : 2013-13-09
 #
 #  Acknowledgements 
 #  ================
@@ -50,9 +50,9 @@ from collections import defaultdict
 from mathutils   import Color
 
 def check_poll_conditions( context ):
-    hdr_image_selected = context.scene.fake_hdr_image
-    rend_engine_is_bi  = context.scene.render.engine == 'BLENDER_RENDER'
-    return hdr_image_selected and rend_engine_is_bi
+    hdr_image_selected  = context.scene.fake_hdr_image
+    render_engine_is_bi = context.scene.render.engine == 'BLENDER_RENDER'
+    return hdr_image_selected and render_engine_is_bi
 
 def change_light_intensity( obj, intensity ):
     """ Change the light intensity of a lamp. Uses the correct methods to 
@@ -128,17 +128,17 @@ class create_hdr_sphere( bpy.types.Operator ):
     def poll( self, context ):
         return check_poll_conditions( context )
 
-    def create_sphere( self, context, lamps ):
+    def create_sphere( self, context, n ):
         bm = bmesh.new()
         
         # Calculate sphere subdivisions
-        subd = round( math.log( lamps / 3 ) / 1.3 )
+        subd = math.trunc( math.log( n / 2.6 ) / 1.37 ) + 1
 
         # Create new icosphere mesh
         sphere_verts = bmesh.ops.create_icosphere( 
             bm, 
             subdivisions = subd,
-            diameter = 1
+            diameter     = 1
          )
 
         # Create new mesh from bmesh
@@ -205,119 +205,37 @@ class create_hdr_sphere( bpy.types.Operator ):
 
         # Bake
         bpy.ops.object.bake_image()
-
-    def create_lamps( self, context, obj ):
-        # TODO:
-        # Rewrite so that instead of using a particle system, we'll:
-        # 1. Go over all vertcolors.
-        # 3. Sort them by value (sum RGB)
-        # 4. Iterate over the top n (n = num_of_lamps specified by user)
-        # 5. Create a lamp at each vert, and assign color.
         
-        # Select and make active
-        context.scene.objects.active = obj
-        obj.select = True
-
-        # Create and reference particle system
-        bpy.ops.object.particle_system_add()
-        psys = obj.particle_systems['ParticleSystem']
-
-        # Change PS type to hair
-        psys.settings.type              = 'HAIR'
-        psys.settings.use_advanced_hair = True
-
-        # Emit particles regularly from the vertices of the mesh
-        psys.settings.emit_from       = 'VERT'
-        psys.settings.use_emit_random = False
-
-        # Number of particles = number of verts
-        psys.settings.count = len(bpy.context.object.data.vertices)
-
-        # Change render type to duplicate objects
-        psys.settings.render_type = 'OBJECT'
-
-        # Create point light and use it as duplicate object on particle system
-        bpy.ops.object.lamp_add(
-            type   = 'POINT', 
-            layers = (False, False, False, False, False, False, False, False, 
-                      False, False, False, False, False, False, False, False, 
-                      False, False, False, True)
-        )
-
-        # Reference lamp
-        lampobj      = bpy.context.scene.objects[ bpy.context.object.name ]
-        lampname     = 'fake_hdr_lamp'
-        lampobj.name = lampname
-
-        # Lamp becomes active and selected after creation, reselect and activate icosphere
-        context.scene.objects.active = obj
-        obj.select = True
-
-        # Set lamp as dupli object for particle system
-        psys.settings.dupli_object = lampobj
-
-        # Convert particle system to real lamp objects
-        bpy.ops.object.duplicates_make_real()
-
-        # Delete (now useless) original lamp
-        bpy.ops.object.select_all( action = 'DESELECT' )
-        lampobj.select               = True
-        context.scene.objects.active = lampobj
-        bpy.ops.object.delete()
-        context.scene.objects.unlink( lampobj )
-
-        # Reference all lamps
-        lamps = [ o for o in bpy.context.scene.objects if lampname in o.name ]
-
-        # Create empty which will act as the lamps' parent object
-        bpy.ops.object.empty_add( type = 'SPHERE' )
-        empty      = bpy.context.scene.objects[ bpy.context.object.name ]
-        empty.name = 'FakeHDR.LightArray.Control'
-
-        # Deselect all objects
-        bpy.ops.object.select_all( action = 'DESELECT' )
-
-        # Set empty as the sphere's parent
-        obj.parent = empty
-        
-        # Make sphere unrendereable and remove its particle system
+        # Make sphere unrendereable
         obj.hide_render = True
 
-        context.scene.objects.active = obj
-        obj.select = True
+    def sort_by_value( self, colors, sorted_list, calls ):
+        """ Recursive sorting algorithm meant to find the smallest to highest
+            color values in a list of averaged vertex colors """
+            
+        # Find the indices that have not been sorted yet
+        unsorted_indices = set( colors.keys() ).difference( set( sorted_list ) )
         
-        bpy.ops.object.particle_system_remove()        
-        
-        # Select all lamps, parent all to empty and add damped track constraints
-        bpy.ops.object.select_all( action = 'DESELECT' )
-        for lamp in lamps:
-            lamp.select = True
-            lamp.parent = empty
+        min        = 4.0
+        smallest_i = 0
+        # Find current darkest vertex
+        for i in unsorted_indices:
+            val = sum( [ c for c in colors[i][:] ] )
+            if val < min:
+                smallest_i = i
+                min        = val
 
-            # Create damped track constraint from lamp to empty to make sure
-            # spots always look in the direction of the empty
-            const = lamp.constraints.new(type='DAMPED_TRACK')
-            const.target     = empty
-            const.track_axis = 'TRACK_NEGATIVE_Z'
+        # Add it to the list of sorted verts
+        sorted_list.append( smallest_i )
 
-            # Set all default parameters
-            props = context.scene.fake_hdr_props
-            lamp.data.distance           = props.lamp_distance
-            lamp.data.shadow_ray_samples = props.lamp_ray_samples
-            lamp.data.shadow_soft_size   = props.lamp_size
-            lamp.data.use_specular       = props.lamp_use_specular
-
-        # Make all lamp instances single users (to enable separate control
-        # over their properties)
-        bpy.ops.object.make_single_user(
-            type   = 'SELECTED_OBJECTS', 
-            object = True, 
-            obdata = True
-        )
-
-        return lamps
-
-    def color_lamps( self, context, obj, lamps ):
+        # If we sorted all the verts, we can return them and exit the function. 
+        # Otherwiese, call it again with the new (incomplete) sorted vert list.
+        if len( sorted_list ) == len( colors ):
+            return sorted_list
+        else:
+            return self.sort_by_value( colors, sorted_list, calls + 1 )
+            
+    def get_vcolors( self, context, obj, n ):
         vcolor_dict = defaultdict(list)
         mesh        = obj.data
         color_layer = obj.data.vertex_colors[0]
@@ -335,38 +253,77 @@ class create_hdr_sphere( bpy.types.Operator ):
             avg_vcolors[ v ] = Color( (
                 sum( [ c.r for c in vcolor_dict[v] ] ) / len( vcolor_dict[v] ),
                 sum( [ c.g for c in vcolor_dict[v] ] ) / len( vcolor_dict[v] ),
-                sum( [ c.b for c in vcolor_dict[v] ] ) / len( vcolor_dict[v] ),
+                sum( [ c.b for c in vcolor_dict[v] ] ) / len( vcolor_dict[v] )
             ) )
 
-        verts = mesh.vertices
-        for v in avg_vcolors:
-            lamp = [ l for l in lamps if l.location == verts[v].co ][0]
-            lamp.data.color = avg_vcolors[v]
+        # Sort verts by value
+        verts_sorted_by_value = self.sort_by_value( avg_vcolors, [], 1 )
 
-        # If the user opted to set the strongest light as a sun lamp
-        # Then find the strongest light and change its type to Sun lamp
-        if context.scene.fake_hdr_props.use_sun:
-            intensities = { # Summarize rgb to get intensity
-                v : sum( [ c for c in avg_vcolors[v] ] ) for v in avg_vcolors 
-            }
+        start = len( avg_vcolors ) - n
+        culled_vert_list = verts_sorted_by_value[ start: ]
         
-            max_lightint = max( intensities.values() ) # Find highest intensity
-            for v,i in intensities.items():
-                if i == max_lightint:
-                    lamp = [ l for l in lamps if l.location == verts[v].co ][0]
-                    lamp.data.type = 'SUN'
-                    value = context.scene.fake_hdr_props.sun_intensity
-                    change_light_intensity( lamp, value )
-                    break # Make sure than no more than one sun exists
+        vcolors = { v : avg_vcolors[v] for v in culled_vert_list }
+        
+        return vcolors
+        
+    def create_lamps( self, context, obj ):
+        # Create empty which will act as the lamps' parent object
+        bpy.ops.object.empty_add( type = 'SPHERE' )
+
+        empty      = context.scene.objects[ context.object.name ]
+        empty.name = 'FakeHDR.LightArray.Control' 
+
+        # Set empty as the sphere's parent
+        obj.parent = empty
+
+        n       = context.scene.fake_hdr_props.num_of_lamps
+        lamps   = []
+        verts   = obj.data.vertices
+        vcolors = self.get_vcolors( context, obj, n )
+        
+        for i,v in enumerate( vcolors.keys() ):
+            bpy.ops.object.lamp_add( type = 'POINT' )
+
+            # Reference lamp (which is now the selected and active object
+            lamp      = context.scene.objects[ context.object.name ]
+            lamp.name = 'fake_hdr_lamp'
+            lamps.append( lamp.name )
+
+            # Parent lamp to empty, and:
+            # Create damped track constraint from lamp to empty to make sure
+            # spots and sun always look in the direction of the empty
+            lamp.parent      = empty 
+            const            = lamp.constraints.new( type = 'DAMPED_TRACK' )
+            const.target     = empty
+            const.track_axis = 'TRACK_NEGATIVE_Z'
+
+            # Set lamp location
+            lamp.location = verts[v].co
+            
+            # Set lamp color
+            lamp.data.color = vcolors[v]
+            
+            # Set all default parameters
+            props = context.scene.fake_hdr_props
+            lamp.data.distance           = props.lamp_distance
+            lamp.data.shadow_ray_samples = props.lamp_ray_samples
+            lamp.data.shadow_soft_size   = props.lamp_size
+            lamp.data.use_specular       = props.lamp_use_specular
+            
+            # make the strongest lamp a sun if option is turned on
+            if context.scene.fake_hdr_props.use_sun and i == len( vcolors ) - 1:
+                lamp.data.type = 'SUN'
+                value = context.scene.fake_hdr_props.sun_intensity
+                change_light_intensity( lamp, value )
+
+        return lamps
 
     def execute( self, context ):
-        lamps = context.scene.fake_hdr_props.num_of_lamps
-        obj   = self.create_sphere( context, lamps )
+        n   = context.scene.fake_hdr_props.num_of_lamps
+        obj = self.create_sphere( context, n )
         self.map_hdr_to_sphere( context, obj )
         self.bake_textures_to_verts( context, obj )
         lamps = self.create_lamps( context, obj )
-        self.color_lamps( context, obj, lamps )
-        lamps = cull_lamps( 
         
         return {'FINISHED'}
 
@@ -446,8 +403,8 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         description = "Number of Lamps in scene",
         name        = "Number of Lamps",
         default     = 50,
-        hard_min    = 12,
-        hard_max    = 2500
+        min         = 12,
+        max         = 2500
     )
                     
     types = [('POINT', 'point', ''), ('SPOT', 'spot', '')]

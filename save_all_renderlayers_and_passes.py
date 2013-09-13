@@ -23,7 +23,7 @@
 #  Studio (sponsor)  : Pitchipoy Animation Productions (www.pitchipoy.tv)
 # 
 #  Start of project              : 2013-04-04 by Tamir Lousky
-#  Last modified                 : 2013-06-08
+#  Last modified                 : 2013-11-09
 #
 #  Acknowledgements 
 #  ================
@@ -34,7 +34,7 @@
 bl_info = {    
     "name"       : "Save Layers and Passes in respectively named folders.",
     "author"     : "Tamir Lousky (Original Author), Luciano Muñoz (added folder creation functionality)",
-    "version"    : (0, 0, 3),
+    "version"    : (0, 0, 4),
     "blender"    : (2, 68, 0),
     "category"   : "Render",
     "location"   : "Node Editor >> Tools",
@@ -66,6 +66,19 @@ class create_nodes( bpy.types.Operator ):
     bl_description = "Create file output nodes for all render layers and passes"
     bl_options     = {'REGISTER', 'UNDO' }
 
+    node_types = {
+        'old' : {
+            'RL' : 'CompositorNodeRLayers',
+            'OF' : 'CompositorNodeOutputFile',
+            'OC' : 'CompositorNodeComposite'
+        },
+        'new' : {
+            'RL' : 'R_LAYERS',
+            'OF' : 'OUTPUT_FILE',
+            'OC' : 'COMPOSITE'
+        },
+    }
+    
     @classmethod
     def poll( self, context ):
         return context.scene.use_nodes
@@ -111,15 +124,114 @@ class create_nodes( bpy.types.Operator ):
                                     pass_name + "/" + l.name + "_" + pass_name
                     else:
                         file_path = imagebase + "_" + pass_name
+
                     pass_info = {
                         'filename' : file_path,
                         'output'   : pass_name
                     }
+
                     layers[l.name].append( pass_info )
             
         return layers
 
-    def execute( self, context):
+    def get_output( self, passout ):
+        """ Find the renderlayer node's output that matches the current render
+            pass """
+    
+        # Renderlayer pass names and renderlayer node output names do not match
+        # which is why we're using this dictionary (and regular expressions)
+        # to match the two
+        output_dict = {
+            'ambient_occlusion' : 'AO',
+            'material_index'    : 'IndexMA',
+            'object_index'      : 'IndexOB',
+            'reflection'        : 'Reflect',
+            'refraction'        : 'Refract',
+            'combined'          : 'Image'
+        }    
+
+        output = ''
+        if passout in output_dict.keys():
+            output = output_dict[ passout ]
+        elif "_" in passout:
+            wl = passout.split("_") # Split to list of words
+            # Capitalize first char in each word and rejoin with spaces
+            output = " ".join([ s[0].capitalize() + s[1:] for s in wl ])
+        else: # If one word, just capitlaize first letter
+            output = passout[0].capitalize() + passout[1:]
+
+        return output
+
+    def create_single_output( self, context, node, output_node, layers, rl ):
+        """ Create a single file output node for all render layers and
+            render passes. Much more orderly and efficient in blender versions
+            above 2.66. In 2.66 and below the API doesn't support creating
+            new file output node sockets so we'll be using another function
+            to create a node per render pass """
+
+        output_node = tree.nodes.new( type = node_types['new']['OF'] )
+
+        # Set base path, location, label and name
+        output_node.base_path = context.scene.render.filepath
+        output_node.location  = 500, 200
+        output_node.label     = 'file output'
+        output_node.name      = 'file output'
+        
+        for rpass in layers[rl]:
+            output = self.get_output( rpass['output'] )
+            
+            if output == 'Image' and not output_node.inputs[ output ].links:
+                links.new( node.outputs[ output ], output_node.inputs[ output ])
+            elif output:
+                # Add file output socket
+                output_node.file_slots.new( name = output ) 
+                
+                file_path = rpass['filename'] 
+                output_node.file_slots[-1].path = rpass['filename']
+                
+                # Set up links
+                links.new( node.outputs[ output ], output_node.inputs[-1] )
+
+        return output_node    
+        
+    def create_output_per_pass( self, context, node, layers, rl, output_number ):
+        for rpass in layers[rl]:
+            ## Create a new file output node
+
+            output_node = ''
+            # Create file output node for each renderpass in each layer
+            output_node = tree.nodes.new( type = node_types['old']['OF'] )
+
+            # Select and activate file output node
+            output_node.select = True
+            tree.nodes.active  = output_node
+
+            # Set node position x,y values
+            file_node_x = 500 
+            file_node_y = 200 * output_number
+            
+            name = rl + "_" + rpass['output']
+            
+            # Set node location, label and name
+            output_node.location = file_node_x, file_node_y
+            output_node.label    = name
+            output_node.name     = name                
+            
+            # Set up file output path
+            output_node.file_slots[0].path = rpass['filename']
+            output_node.base_path          = context.scene.render.filepath
+
+            output = self.get_output( rpass['output'] )
+
+            # Set up links
+            if output:
+                links.new( node.outputs[ output ], output_node.inputs[0] )
+
+            output_number += 1
+            
+            return output_number
+                
+    def execute( self, context ):
         basename    = self.find_base_name()
         layers      = self.get_layers_and_passes( context, basename )
 
@@ -133,41 +245,18 @@ class create_nodes( bpy.types.Operator ):
         output_number = 0
         node = ''  # Initialize node so that it would exist outside the loop
 
-        node_types = {
-            67 : {
-                'RL' : 'CompositorNodeRLayers',
-                'OF' : 'CompositorNodeOutputFile',
-                'OC' : 'CompositorNodeComposite'
-            },
-            66 : {
-                'RL' : 'R_LAYERS',
-                'OF' : 'OUTPUT_FILE',
-                'OC' : 'COMPOSITE'
-            },
-        }
-        
-        # Renderlayer pass names and renderlayer node output names do not match
-        # which is why we're using this dictionary (and some regular expressions
-        # later to match the two)
-        output_dict = {
-            'ambient_occlusion' : 'AO',
-            'material_index'    : 'IndexMA',
-            'object_index'      : 'IndexOB',
-            'reflection'        : 'Reflect',
-            'refraction'        : 'Refract',
-            'combined'          : 'Image'
-        }
-
         # Get blender version
         version = bpy.app.version[1]
+
+        output_node = ''
 
         for rl in layers:
             # Create a new render layer node
             node = ''
             if version > 66:
-                node = tree.nodes.new( type = node_types[67]['RL'] )
+                node = tree.nodes.new( type = node_types['new']['RL'] )
             else:
-                node = tree.nodes.new( type = node_types[66]['RL'] )
+                node = tree.nodes.new( type = node_types['old']['RL'] )
 
             # Set node location, label and name
             node.location = 0, rl_nodes_y
@@ -176,62 +265,32 @@ class create_nodes( bpy.types.Operator ):
             
             # Select the relevant render layer
             node.layer = rl
-            
-            for rpass in layers[rl]:
-                ## Create a new file output node
-                
-                # Create file output node
-                output_node = ''
-                if version > 66:
-                    output_node = tree.nodes.new( type = node_types[67]['OF'] )
-                else:
-                    output_node = tree.nodes.new( type = node_types[66]['OF'] )
 
-                # Select and activate file output node
-                output_node.select = True
-                tree.nodes.active  = output_node
+            if version > 66:
+                # Create single file output node
+                output_node = self.create_single_output( 
+                    context,
+                    node,
+                    output_node, 
+                    layers[rl] 
+                )
+            else:
+                output_number = self.create_output_per_pass(
+                    context,
+                    node,
+                    layers, 
+                    rl,
+                    output_number
+                )
 
-                # Set node position x,y values
-                file_node_x = 500 
-                file_node_y = 200 * output_number
-                
-                name = rl + "_" + rpass['output']
-                
-                # Set node location, label and name
-                output_node.location = file_node_x, file_node_y
-                output_node.label    = name
-                output_node.name     = name                
-                
-                # Set up file output path
-                output_node.file_slots[0].path = rpass['filename']
-                output_node.base_path          = context.scene.render.filepath
-
-                output  = ''
-                passout = rpass['output']
-
-                if passout in output_dict.keys():
-                    output = output_dict[ passout ]
-                elif "_" in passout:
-                    wl = passout.split("_") # Split to list of words
-                    # Capitalize first char in each word and rejoin with spaces
-                    output = " ".join( s[0].capitalize() + s[1:] for s in wl )
-                else: # If one word, just capitlaize first letter
-                    output = passout[0].capitalize() + passout[1:]
-
-                # Set up links
-                if output:
-                    links.new( node.outputs[ output ], output_node.inputs[0] )
-
-                output_number += 1
-                
             rl_nodes_y += 300
 
         # Create composite node, just to enable rendering
         cnode = ''
         if version > 66:
-            cnode = tree.nodes.new( type = node_types[67]['OC'] )
+            cnode = tree.nodes.new( type = node_types['new']['OC'] )
         else:
-            cnode = tree.nodes.new( type = node_types[66]['OC'] )
+            cnode = tree.nodes.new( type = node_types['old']['OC'] )
         
         # Link composite node with the last render layer created
         links.new( node.outputs[ 'Image' ], cnode.inputs[0] )

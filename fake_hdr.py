@@ -20,8 +20,8 @@
 #  Author            : Tamir Lousky [ tlousky@gmail.com, tamir@pitchipoy.tv ]
 #  Homepage(Wiki)    : http://bioblog3d.wordpress.com/
 #  Studio (sponsor)  : PitchiPoy Animation Productions (PitchiPoy.tv)
-#  Start of project              : 2013-11-08 by Tamir Lousky
-#  Last modified                 : 2013-13-08
+#  Start of project  : 2013-11-08 by Tamir Lousky
+#  Last modified     : 2013-12-09
 #
 #  Acknowledgements 
 #  ================
@@ -29,20 +29,23 @@
 #             Dima Kondrashov (for feature suggestions and testing)
 #  Zeffii @ StackExchange - for providing really useful insights and sample code 
 #                           on how vertex colors can be matched with mesh verts.
+#  Matan Harel from XLN.org.il: who helped me with the calculations related to
+#                               converting from number of lamps to icosphere
+#                               subdivisions.
 
 bl_info = {    
-    "name"       : "Fake HDR",
-    "author"     : "Tamir Lousky",
-    "version"    : (0, 0, 1),
-    "blender"    : (2, 68, 0),
-    "category"   : "Render",
-    "location"   : "3D View >> Tools",
-    "wiki_url"   : "https://github.com/Tlousky/production_scripts/wiki/Fake-HDR",
-    "tracker_url": "https://github.com/Tlousky/production_scripts/blob/master/fake_hdr.py",
-    "description": "Create an array of stops that mimicks an HDR image"
+    "name"        : "Fake HDR",
+    "author"      : "Tamir Lousky",
+    "version"     : (0, 0, 2),
+    "blender"     : (2, 68, 0),
+    "category"    : "Render",
+    "location"    : "3D View >> Tools",
+    "wiki_url"    : "https://github.com/Tlousky/production_scripts/wiki/Fake-HDR",
+    "tracker_url" : "https://github.com/Tlousky/production_scripts/blob/master/fake_hdr.py",
+    "description" : "Create an array of lamps that mimicks an HDR image"
 }
 
-import bpy, re, bmesh
+import bpy, re, bmesh, math
 from collections import defaultdict
 from mathutils   import Color
 
@@ -86,7 +89,7 @@ class fake_hdr(bpy.types.Panel):
             bpy.data, "images"                # From list of images in scene
         )
 
-        col.prop( props, 'sphere_resolution' )
+        col.prop( props, 'num_of_lamps' )
 
         layout.operator( 'render.create_hdr_sphere' )
 
@@ -125,8 +128,12 @@ class create_hdr_sphere( bpy.types.Operator ):
     def poll( self, context ):
         return check_poll_conditions( context )
 
-    def create_sphere( self, context, subd ):
+    def create_sphere( self, context, lamps ):
         bm = bmesh.new()
+        
+        # Calculate sphere subdivisions
+        subd = round( math.log( lamps / 3 ) / 1.3 )
+
         # Create new icosphere mesh
         sphere_verts = bmesh.ops.create_icosphere( 
             bm, 
@@ -200,6 +207,13 @@ class create_hdr_sphere( bpy.types.Operator ):
         bpy.ops.object.bake_image()
 
     def create_lamps( self, context, obj ):
+        # TODO:
+        # Rewrite so that instead of using a particle system, we'll:
+        # 1. Go over all vertcolors.
+        # 3. Sort them by value (sum RGB)
+        # 4. Iterate over the top n (n = num_of_lamps specified by user)
+        # 5. Create a lamp at each vert, and assign color.
+        
         # Select and make active
         context.scene.objects.active = obj
         obj.select = True
@@ -346,15 +360,15 @@ class create_hdr_sphere( bpy.types.Operator ):
                     break # Make sure than no more than one sun exists
 
     def execute( self, context ):
-        subd = context.scene.fake_hdr_props.sphere_resolution
-        obj  = self.create_sphere( context, subd )
+        lamps = context.scene.fake_hdr_props.num_of_lamps
+        obj   = self.create_sphere( context, lamps )
         self.map_hdr_to_sphere( context, obj )
         self.bake_textures_to_verts( context, obj )
         lamps = self.create_lamps( context, obj )
         self.color_lamps( context, obj, lamps )
-
+        lamps = cull_lamps( 
+        
         return {'FINISHED'}
-
 
 class fake_HDR_props( bpy.types.PropertyGroup ):
     def find_lamps( self, context ):
@@ -428,12 +442,14 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
 
                     break # Make sure than no more than one sun exists
 
-    sphere_resolution = bpy.props.IntProperty(
-        description = "Light sphere subdivisions",
-        name        = "Sphere Resolution",
-        default     = 1
+    num_of_lamps = bpy.props.IntProperty(
+        description = "Number of Lamps in scene",
+        name        = "Number of Lamps",
+        default     = 50,
+        hard_min    = 12,
+        hard_max    = 2500
     )
-
+                    
     types = [('POINT', 'point', ''), ('SPOT', 'spot', '')]
     lamp_type = bpy.props.EnumProperty(
         name    = "Lamp Type",
@@ -498,8 +514,6 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         default     = 5.0,
         update      = update_intensity
     )
-
-
 
 def register():
     bpy.utils.register_module(__name__)

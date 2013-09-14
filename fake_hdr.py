@@ -421,7 +421,12 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
 
     def update_shadow_type( self, context ):
         n     = context.scene.fake_hdr_props.shadow_casting_lamps
+        t     = context.scene.fake_hdr_props.lamp_type
         stype = context.scene.fake_hdr_props.lamp_shadow_type
+
+        if t == 'SPOT':
+            stype = context.scene.fake_hdr_props.spot_shadow_type
+
         lamps = self.find_lamps( context )
 
         # Make sure only the number of lamps indicated by user will cast shadows
@@ -468,31 +473,50 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
                     break # Make sure than no more than one sun exists
 
     def update_spot_size( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.spot_size
+        for l in self.find_lamps(context):
+            l.data.shadow_spot_size = value
         
     def update_spot_blend( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.spot_blend
+        for l in self.find_lamps(context):
+            l.data.shadow_spot_blend = value
+
         
     def update_buffer_type( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.buffer_type
+        for l in self.find_lamps(context):
+            l.data.shadow_buffer_type = value
         
     def update_buffer_filter_type( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.filter_type
+        for l in self.find_lamps(context):
+            l.data.shadow_filter_type = value
         
     def update_sample_buffers( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.sample_buffers
+        for l in self.find_lamps(context):
+            l.data.shadow_sample_buffers = value
 
     def update_buffer_softness( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.buffer_softness
+        for l in self.find_lamps(context):
+            l.data.shadow_buffer_soft = value
         
     def update_buffer_size( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.buffer_size
+        for l in self.find_lamps(context):
+            l.data.shadow_buffer_size = value
         
     def update_buffer_bias( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.buffer_bias
+        for l in self.find_lamps(context):
+            l.data.shadow_buffer_bias = value
 
     def update_buffer_samples( self, context ):
-        pass
+        value = context.scene.fake_hdr_props.buffer_samples
+        for l in self.find_lamps(context):
+            l.data.shadow_buffer_samples = value
 
     num_of_lamps = bpy.props.IntProperty(
         description = "Number of Lamps in scene",

@@ -65,6 +65,32 @@ def change_light_intensity( obj, intensity ):
     else:
         obj.data.energy = intensity
 
+def sort_by_value( colors, sorted_list, calls ):
+    """ Recursive sorting algorithm meant to find the smallest to highest
+        color values in a list of averaged vertex colors """
+        
+    # Find the indices that have not been sorted yet
+    unsorted_indices = set( colors.keys() ).difference( set( sorted_list ) )
+    
+    min        = 4.0
+    smallest_i = 0
+    # Find current darkest vertex
+    for i in unsorted_indices:
+        val = sum( [ c for c in colors[i][:] ] )
+        if val < min:
+            smallest_i = i
+            min        = val
+
+    # Add it to the list of sorted verts
+    sorted_list.append( smallest_i )
+
+    # If we sorted all the verts, we can return them and exit the function. 
+    # Otherwiese, call it again with the new (incomplete) sorted vert list.
+    if len( sorted_list ) == len( colors ):
+        return sorted_list
+    else:
+        return sort_by_value( colors, sorted_list, calls + 1 )
+        
 class fake_hdr(bpy.types.Panel):
     bl_idname      = "FakeHDR"
     bl_label       = "Fake HDR"
@@ -90,8 +116,9 @@ class fake_hdr(bpy.types.Panel):
         )
 
         col.prop( props, 'num_of_lamps' )
+        col.prop( props, 'shadow_casting_lamps' )
 
-        layout.operator( 'render.create_hdr_sphere' )
+        layout.operator( 'render.create_hdr_sphere', icon = 'MAT_SPHERE_SKY' )
 
         if 'FakeHDR.LightArray.Control' in context.scene.objects:
             lbl = layout.label( "Update lamp properties" )
@@ -101,7 +128,6 @@ class fake_hdr(bpy.types.Panel):
             col.prop( context.scene.fake_hdr_props, 'lamp_type'         )
             col.prop( context.scene.fake_hdr_props, 'lamp_intensity'    )
             col.prop( context.scene.fake_hdr_props, 'lamp_distance'     )
-            col.prop( context.scene.fake_hdr_props, 'lamp_shadow_type'  )
             col.prop( context.scene.fake_hdr_props, 'lamp_use_specular' )
             
             if props.lamp_shadow_type == 'RAY_SHADOW':
@@ -109,6 +135,51 @@ class fake_hdr(bpy.types.Panel):
 
             col.prop( context.scene.fake_hdr_props, 'lamp_size' )
 
+            if props.lamp_type == 'SPOT':
+                col.prop( 
+                    context.scene.fake_hdr_props,
+                    'spot_shadow_type', 
+                    expand = True 
+                )
+                
+                row = col.row()
+                row.prop( 
+                    context.scene.fake_hdr_props, 'spot_size', text = 'Size' 
+                )
+
+                row.prop( 
+                    context.scene.fake_hdr_props, 
+                    'spot_blend', 
+                    text = 'Blend',
+                    Slider = True 
+                )
+                
+            else:
+                col.prop( 
+                    context.scene.fake_hdr_props, 
+                    'lamp_shadow_type',
+                    expand = True
+                )
+            
+            if props.lamp_shadow_type == 'BUFFER_SHADOW':
+                col.separator()
+                col.prop( 
+                    context.scene.fake_hdr_props, 'buffer_type', expand = True 
+                )
+
+                col.prop( 
+                    context.scene.fake_hdr_props, 'filter_type', expand = True 
+                )
+
+                row = col.row()
+                row.prop( context.scene.fake_hdr_props, 'sample_buffers'  )
+                row.prop( context.scene.fake_hdr_props, 'buffer_softness' )
+                row.prop( context.scene.fake_hdr_props, 'buffer_size'     )
+
+                row = col.row()
+                row.prop( context.scene.fake_hdr_props, 'buffer_bias'    )
+                row.prop( context.scene.fake_hdr_props, 'buffer_samples' )
+                
             lbl = layout.label( "Make sun lamp of strongest light" )
             box = layout.box()
             col = box.column()
@@ -209,32 +280,6 @@ class create_hdr_sphere( bpy.types.Operator ):
         # Make sphere unrendereable
         obj.hide_render = True
 
-    def sort_by_value( self, colors, sorted_list, calls ):
-        """ Recursive sorting algorithm meant to find the smallest to highest
-            color values in a list of averaged vertex colors """
-            
-        # Find the indices that have not been sorted yet
-        unsorted_indices = set( colors.keys() ).difference( set( sorted_list ) )
-        
-        min        = 4.0
-        smallest_i = 0
-        # Find current darkest vertex
-        for i in unsorted_indices:
-            val = sum( [ c for c in colors[i][:] ] )
-            if val < min:
-                smallest_i = i
-                min        = val
-
-        # Add it to the list of sorted verts
-        sorted_list.append( smallest_i )
-
-        # If we sorted all the verts, we can return them and exit the function. 
-        # Otherwiese, call it again with the new (incomplete) sorted vert list.
-        if len( sorted_list ) == len( colors ):
-            return sorted_list
-        else:
-            return self.sort_by_value( colors, sorted_list, calls + 1 )
-            
     def get_vcolors( self, context, obj, n ):
         vcolor_dict = defaultdict(list)
         mesh        = obj.data
@@ -257,7 +302,7 @@ class create_hdr_sphere( bpy.types.Operator ):
             ) )
 
         # Sort verts by value
-        verts_sorted_by_value = self.sort_by_value( avg_vcolors, [], 1 )
+        verts_sorted_by_value = sort_by_value( avg_vcolors, [], 1 )
 
         start = len( avg_vcolors ) - n
         culled_vert_list = verts_sorted_by_value[ start: ]
@@ -330,7 +375,21 @@ class create_hdr_sphere( bpy.types.Operator ):
 class fake_HDR_props( bpy.types.PropertyGroup ):
     def find_lamps( self, context ):
         empty = context.scene.objects['FakeHDR.LightArray.Control']
-        return [ c for c in empty.children if c.type == 'LAMP' ]   
+        objs  = context.scene.objects
+
+        # Reference lamps by name to create a persisten reference list
+        all_lamps = [ 
+            objs[c.name] for c in empty.children if c.type == 'LAMP'
+        ]
+
+        lamp_indices_and_colors = { 
+            i : all_lamps[i].data.color for i in range( len( all_lamps ) )
+        }
+
+        # Sort and return list of lamps sorted by color value (brightness)
+        sorted_indices = sort_by_value( lamp_indices_and_colors, [], 1 )
+
+        return [ all_lamps[i] for i in sorted_indices ]
 
     def update_intensity( self, context ):
         value  = context.scene.fake_hdr_props.lamp_intensity
@@ -359,9 +418,16 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
             l.data.use_specular = context.scene.fake_hdr_props.lamp_use_specular
 
     def update_shadow_type( self, context ):
-        value = context.scene.fake_hdr_props.lamp_shadow_type
-        for l in self.find_lamps(context):
-            l.data.shadow_method = value
+        n     = context.scene.fake_hdr_props.shadow_casting_lamps
+        stype = context.scene.fake_hdr_props.lamp_shadow_type
+        lamps = self.find_lamps( context )
+
+        # Make sure only the number of lamps indicated by user will cast shadows
+        for i,l in enumerate( lamps ):
+            if i >= len( lamps ) - n:
+                l.data.shadow_method = stype
+            else:
+                l.data.shadow_method = 'NOSHADOW'
 
     def update_ray_samples( self, context ):
         value = context.scene.fake_hdr_props.lamp_ray_samples
@@ -406,7 +472,15 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         min         = 12,
         max         = 2500
     )
-                    
+
+    shadow_casting_lamps = bpy.props.IntProperty(
+        description = "Number of Shadow Casting Lamps in Scene",
+        name        = "Shadow Casting Lamps",
+        default     = 1,
+        min         = 0,
+        max         = 2500
+    )
+    
     types = [('POINT', 'point', ''), ('SPOT', 'spot', '')]
     lamp_type = bpy.props.EnumProperty(
         name    = "Lamp Type",
@@ -443,10 +517,15 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         update      = update_use_specular
     )
 
-    shadow_types = [('NOSHADOW', 'No Shadow', ''), ('RAY_SHADOW', 'Ray Shadow', '')]
+    shadow_types = [
+        ('NOSHADOW',      'No Shadow',     ''), 
+        ('RAY_SHADOW',    'Ray Shadow',    ''),
+        ('BUFFER_SHADOW', 'Buffer Shadow', '')
+    ]
+
     lamp_shadow_type = bpy.props.EnumProperty(
         name    = "Shadow type",
-        items   = shadow_types, 
+        items   = shadow_types[:-1], 
         default = 'NOSHADOW',
         update  = update_shadow_type
     )
@@ -471,7 +550,106 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         default     = 5.0,
         update      = update_intensity
     )
+    
+    # Spot lamp properties
+    spot_shadow_type = bpy.props.EnumProperty(
+        name    = "Shadow type",
+        items   = shadow_types,
+        default = 'NOSHADOW',
+        update  = update_shadow_type
+    )
+    
+    spot_size = bpy.props.FloatProperty(
+        name        = "Spot Size (cone angle)",
+        description = "The cone angle of the spot lamp",
+        default     = math.radians(45.0),
+        min         = math.radians(1.0),
+        max         = math.radians(180.0),
+        update      = update_spot_size
+    )
+    
+    spot_blend = bpy.props.FloatProperty(
+        name        = "Spot Size (cone angle)",
+        description = "The cone angle of the spot lamp",
+        default     = 0.15,
+        min         = 0.0
+        max         = 1.0
+        update      = update_spot_size
+    )
+    
+    # Spot buffer shadow properties
+    buffer_types = [
+        ('REGULAR',   'Classical',         ''), 
+        ('HALFWAY',   'Classical-Halfway', ''),
+        ('IRREGULAR', 'Irregular',         ''),
+        ('DEEP',      'Deep',              '')
+    ]
 
+    buffer_filter_types = [
+        ('BOX', 'Box', ''), ('TENT', 'Tent', ''), ('GAUSS', 'Gauss', '')
+    ]
+
+    buffer_samples = [ ( 1, '1', '' ), ( 4, '4', '' ), ( 9, '9', '' ) ]
+    
+    buffer_type = bpy.props.EnumProperty(
+        name    = "Buffer type",
+        items   = buffer_types,
+        default = 'HALFWAY',
+        update  = update_buffer_type
+    )
+    
+    filter_type = bpy.props.EnumProperty(
+        name    = "Filter type",
+        items   = buffer_filter_types,
+        default = 'BOX',
+        update  = update_buffer_filter_type
+    )
+    
+    sample_buffers = bpy.props.EnumProperty(
+        name        = "Sample Buffers",
+        description = "Number of Anti Aliasing Samples",
+        items       = buffer_samples,
+        default     = 1,
+        update      = update_buffer_samples
+    )
+
+    buffer_softness = bpy.props.FloatProperty(
+        name        = "Buffer Shadow Softness",
+        description = "Buffer shadow's softness",
+        default     = 3.0,
+        min         = 0.0
+        max         = 100.0
+        update      = update_buffer_softness
+    )
+
+    buffer_size = bpy.props.IntProperty(
+        name        = "Buffer shadow size",
+        description = "Buffer shadow's resolution",
+        default     = 512,
+        min         = 0
+        update      = update_buffer_size
+    )
+    
+    buffer_bias = bpy.props.FloatProperty(
+        name        = "Buffer Shadow Bias",
+        description = "Buffer shadow's bias",
+        default     = 3.0,
+        min         = 0.0
+        max         = 100.0
+        update      = update_buffer_bias
+    )
+
+    buffer_samples = bpy.props.IntProperty(
+        name        = "Samples",
+        description = "Buffer shadow samples",
+        default     = 3,
+        min         = 1,
+        max         = 16
+        update      = update_buffer_size
+    )
+    
+    
+    
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.Scene.fake_hdr_props = bpy.props.PointerProperty( 

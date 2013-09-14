@@ -128,8 +128,14 @@ class fake_hdr(bpy.types.Panel):
             col.prop( context.scene.fake_hdr_props, 'lamp_type' )
 
             row = col.row()
-            row.prop( context.scene.fake_hdr_props, 'lamp_intensity'    )
-            row.prop( context.scene.fake_hdr_props, 'lamp_distance'     )
+            row.prop( 
+                context.scene.fake_hdr_props, 
+                'lamp_intensity', 
+                text = 'Intensity' 
+            )
+            row.prop( 
+                context.scene.fake_hdr_props, 'lamp_distance', text = 'Distance'  
+            )
             row.prop( context.scene.fake_hdr_props, 'lamp_use_specular' )
             
             if props.lamp_shadow_type == 'RAY_SHADOW':
@@ -154,6 +160,20 @@ class fake_hdr(bpy.types.Panel):
                     text = 'Blend',
                     slider = True 
                 )
+
+                if props.spot_shadow_type == 'BUFFER_SHADOW':
+                    col.separator()
+                    col.prop( context.scene.fake_hdr_props, 'buffer_type' )
+                    col.prop( context.scene.fake_hdr_props, 'filter_type' )
+
+                    row = col.row()
+                    row.prop( context.scene.fake_hdr_props, 'sample_buffers'  )
+                    row.prop( context.scene.fake_hdr_props, 'buffer_softness' )
+                    row.prop( context.scene.fake_hdr_props, 'buffer_size'     )
+
+                    row = col.row()
+                    row.prop( context.scene.fake_hdr_props, 'buffer_bias'    )
+                    row.prop( context.scene.fake_hdr_props, 'buffer_samples' )
                 
             else:
                 col.prop( 
@@ -162,25 +182,6 @@ class fake_hdr(bpy.types.Panel):
                     expand = True
                 )
             
-            if props.lamp_shadow_type == 'BUFFER_SHADOW':
-                col.separator()
-                col.prop( 
-                    context.scene.fake_hdr_props, 'buffer_type', expand = True 
-                )
-
-                col.prop( 
-                    context.scene.fake_hdr_props, 'filter_type', expand = True 
-                )
-
-                row = col.row()
-                row.prop( context.scene.fake_hdr_props, 'sample_buffers'  )
-                row.prop( context.scene.fake_hdr_props, 'buffer_softness' )
-                row.prop( context.scene.fake_hdr_props, 'buffer_size'     )
-
-                row = col.row()
-                row.prop( context.scene.fake_hdr_props, 'buffer_bias'    )
-                row.prop( context.scene.fake_hdr_props, 'buffer_samples' )
-
             layout.separator()
             lbl = layout.label( "Make sun lamp of strongest light" )
             box = layout.box()

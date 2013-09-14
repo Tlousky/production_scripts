@@ -125,21 +125,22 @@ class fake_hdr(bpy.types.Panel):
             box = layout.box()
             col = box.column()
 
-            col.prop( context.scene.fake_hdr_props, 'lamp_type'         )
-            col.prop( context.scene.fake_hdr_props, 'lamp_intensity'    )
-            col.prop( context.scene.fake_hdr_props, 'lamp_distance'     )
-            col.prop( context.scene.fake_hdr_props, 'lamp_use_specular' )
+            col.prop( context.scene.fake_hdr_props, 'lamp_type' )
+
+            row = col.row()
+            row.prop( context.scene.fake_hdr_props, 'lamp_intensity'    )
+            row.prop( context.scene.fake_hdr_props, 'lamp_distance'     )
+            row.prop( context.scene.fake_hdr_props, 'lamp_use_specular' )
             
             if props.lamp_shadow_type == 'RAY_SHADOW':
                 col.prop( context.scene.fake_hdr_props, 'lamp_ray_samples' )
 
             col.prop( context.scene.fake_hdr_props, 'lamp_size' )
 
+            col.separator()
             if props.lamp_type == 'SPOT':
                 col.prop( 
-                    context.scene.fake_hdr_props,
-                    'spot_shadow_type', 
-                    expand = True 
+                    context.scene.fake_hdr_props, 'spot_shadow_type'
                 )
                 
                 row = col.row()
@@ -151,7 +152,7 @@ class fake_hdr(bpy.types.Panel):
                     context.scene.fake_hdr_props, 
                     'spot_blend', 
                     text = 'Blend',
-                    Slider = True 
+                    slider = True 
                 )
                 
             else:
@@ -179,7 +180,8 @@ class fake_hdr(bpy.types.Panel):
                 row = col.row()
                 row.prop( context.scene.fake_hdr_props, 'buffer_bias'    )
                 row.prop( context.scene.fake_hdr_props, 'buffer_samples' )
-                
+
+            layout.separator()
             lbl = layout.label( "Make sun lamp of strongest light" )
             box = layout.box()
             col = box.column()
@@ -465,6 +467,33 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
 
                     break # Make sure than no more than one sun exists
 
+    def update_spot_size( self, context ):
+        pass
+        
+    def update_spot_blend( self, context ):
+        pass
+        
+    def update_buffer_type( self, context ):
+        pass
+        
+    def update_buffer_filter_type( self, context ):
+        pass
+        
+    def update_sample_buffers( self, context ):
+        pass
+
+    def update_buffer_softness( self, context ):
+        pass
+        
+    def update_buffer_size( self, context ):
+        pass
+        
+    def update_buffer_bias( self, context ):
+        pass
+
+    def update_buffer_samples( self, context ):
+        pass
+
     num_of_lamps = bpy.props.IntProperty(
         description = "Number of Lamps in scene",
         name        = "Number of Lamps",
@@ -572,9 +601,9 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         name        = "Spot Size (cone angle)",
         description = "The cone angle of the spot lamp",
         default     = 0.15,
-        min         = 0.0
-        max         = 1.0
-        update      = update_spot_size
+        min         = 0.0,
+        max         = 1.0,
+        update      = update_spot_blend
     )
     
     # Spot buffer shadow properties
@@ -589,7 +618,7 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         ('BOX', 'Box', ''), ('TENT', 'Tent', ''), ('GAUSS', 'Gauss', '')
     ]
 
-    buffer_samples = [ ( 1, '1', '' ), ( 4, '4', '' ), ( 9, '9', '' ) ]
+    buffer_samples = [ ( '1', '1', '' ), ( '4', '4', '' ), ( '9', '9', '' ) ]
     
     buffer_type = bpy.props.EnumProperty(
         name    = "Buffer type",
@@ -609,7 +638,7 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         name        = "Sample Buffers",
         description = "Number of Anti Aliasing Samples",
         items       = buffer_samples,
-        default     = 1,
+        default     = '1',
         update      = update_buffer_samples
     )
 
@@ -617,8 +646,8 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         name        = "Buffer Shadow Softness",
         description = "Buffer shadow's softness",
         default     = 3.0,
-        min         = 0.0
-        max         = 100.0
+        min         = 0.0,
+        max         = 100.0,
         update      = update_buffer_softness
     )
 
@@ -626,7 +655,7 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         name        = "Buffer shadow size",
         description = "Buffer shadow's resolution",
         default     = 512,
-        min         = 0
+        min         = 0,
         update      = update_buffer_size
     )
     
@@ -634,8 +663,8 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         name        = "Buffer Shadow Bias",
         description = "Buffer shadow's bias",
         default     = 3.0,
-        min         = 0.0
-        max         = 100.0
+        min         = 0.0,
+        max         = 100.0,
         update      = update_buffer_bias
     )
 
@@ -644,12 +673,10 @@ class fake_HDR_props( bpy.types.PropertyGroup ):
         description = "Buffer shadow samples",
         default     = 3,
         min         = 1,
-        max         = 16
-        update      = update_buffer_size
+        max         = 16,
+        update      = update_buffer_samples
     )
-    
-    
-    
+
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.Scene.fake_hdr_props = bpy.props.PointerProperty( 
@@ -659,3 +686,4 @@ def register():
     
 def unregister():
     bpy.utils.unregister_module(__name__)
+    bpy.types.Scene.fake_hdr_image = None

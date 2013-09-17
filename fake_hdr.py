@@ -206,7 +206,10 @@ class create_hdr_sphere( bpy.types.Operator ):
         bm = bmesh.new()
         
         # Calculate sphere subdivisions
-        subd = math.trunc( math.log( n / 2.6 ) / 1.37 ) + 1
+        # The relationship between vert count and subdivisions is as follows:
+        # subdivisions = log( ( vert_count - 2 ) / 2.5, base4 )
+        # The subdivisions are rounded up to the num of verts > num of lights
+        subd = math.ceil( math.log( (n - 2) / 2.5, 4 ) )
 
         # Create new icosphere mesh
         sphere_verts = bmesh.ops.create_icosphere( 

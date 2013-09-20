@@ -147,7 +147,8 @@ class create_nodes( bpy.types.Operator ):
             'object_index'      : 'IndexOB',
             'reflection'        : 'Reflect',
             'refraction'        : 'Refract',
-            'combined'          : 'Image'
+            'combined'          : 'Image',
+            'uv'                : 'UV'
         }    
 
         output = ''
@@ -226,14 +227,14 @@ class create_nodes( bpy.types.Operator ):
             output_node.base_path          = context.scene.render.filepath
 
             output = self.get_output( rpass['output'] )
-
+           
             # Set up links
             if output:
                 links.new( node.outputs[ output ], output_node.inputs[0] )
 
             output_number += 1
             
-            return output_number
+        return output_number
                 
     def execute( self, context ):
         basename    = self.find_base_name()

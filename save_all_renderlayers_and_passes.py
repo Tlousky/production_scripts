@@ -67,12 +67,12 @@ class create_nodes( bpy.types.Operator ):
     bl_options     = {'REGISTER', 'UNDO' }
 
     node_types = {
-        'old' : {
+        'new' : {
             'RL' : 'CompositorNodeRLayers',
             'OF' : 'CompositorNodeOutputFile',
             'OC' : 'CompositorNodeComposite'
         },
-        'new' : {
+        'old' : {
             'RL' : 'R_LAYERS',
             'OF' : 'OUTPUT_FILE',
             'OC' : 'COMPOSITE'
@@ -162,14 +162,16 @@ class create_nodes( bpy.types.Operator ):
 
         return output
 
-    def create_single_output( self, context, node, output_node, layers, rl ):
+    def create_single_output( 
+        self, context, tree, links,  node, output_node, layers, rl 
+    ):
         """ Create a single file output node for all render layers and
             render passes. Much more orderly and efficient in blender versions
             above 2.66. In 2.66 and below the API doesn't support creating
             new file output node sockets so we'll be using another function
             to create a node per render pass """
 
-        output_node = tree.nodes.new( type = node_types['new']['OF'] )
+        output_node = tree.nodes.new( type = self.node_types['new']['OF'] )
 
         # Set base path, location, label and name
         output_node.base_path = context.scene.render.filepath
@@ -194,13 +196,15 @@ class create_nodes( bpy.types.Operator ):
 
         return output_node    
         
-    def create_output_per_pass( self, context, node, layers, rl, output_number ):
+    def create_output_per_pass( 
+        self, context, tree, links, node, blver, layers, rl, output_number 
+    ):
         for rpass in layers[rl]:
             ## Create a new file output node
 
             output_node = ''
             # Create file output node for each renderpass in each layer
-            output_node = tree.nodes.new( type = node_types['old']['OF'] )
+            output_node = tree.nodes.new( type = self.node_types[blver]['OF'] )
 
             # Select and activate file output node
             output_node.select = True
@@ -254,9 +258,9 @@ class create_nodes( bpy.types.Operator ):
             # Create a new render layer node
             node = ''
             if version > 66:
-                node = tree.nodes.new( type = node_types['new']['RL'] )
+                node = tree.nodes.new( type = self.node_types['new']['RL'] )
             else:
-                node = tree.nodes.new( type = node_types['old']['RL'] )
+                node = tree.nodes.new( type = self.node_types['old']['RL'] )
 
             # Set node location, label and name
             node.location = 0, rl_nodes_y
@@ -267,17 +271,34 @@ class create_nodes( bpy.types.Operator ):
             node.layer = rl
 
             if version > 66:
-                # Create single file output node
-                output_node = self.create_single_output( 
-                    context,
-                    node,
-                    output_node, 
-                    layers[rl] 
-                )
+                if version < 69:
+                    output_number = self.create_output_per_pass(
+                        context,
+                        tree,
+                        links,
+                        node,
+                        'new',
+                        layers, 
+                        rl,
+                        output_number
+                    )
+                else:
+                    output_node = self.create_single_output( 
+                        context,
+                        tree,
+                        links,
+                        node,
+                        output_node, 
+                        layers[rl] ,
+                        rl
+                    )
             else:
                 output_number = self.create_output_per_pass(
                     context,
+                    tree,
+                    links,
                     node,
+                    'old',
                     layers, 
                     rl,
                     output_number
@@ -288,9 +309,9 @@ class create_nodes( bpy.types.Operator ):
         # Create composite node, just to enable rendering
         cnode = ''
         if version > 66:
-            cnode = tree.nodes.new( type = node_types['new']['OC'] )
+            cnode = tree.nodes.new( type = self.node_types['new']['OC'] )
         else:
-            cnode = tree.nodes.new( type = node_types['old']['OC'] )
+            cnode = tree.nodes.new( type = self.node_types['old']['OC'] )
         
         # Link composite node with the last render layer created
         links.new( node.outputs[ 'Image' ], cnode.inputs[0] )

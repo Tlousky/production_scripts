@@ -164,7 +164,7 @@ class create_nodes( bpy.types.Operator ):
         return output
 
     def create_single_output( 
-        self, context, tree, links,  node, output_node, layers, rl 
+        self, context, tree, links,  node, output_node, layer, rl 
     ):
         """ Create a single file output node for all render layers and
             render passes. Much more orderly and efficient in blender versions
@@ -180,7 +180,7 @@ class create_nodes( bpy.types.Operator ):
         output_node.label     = 'file output'
         output_node.name      = 'file output'
         
-        for rpass in layers[rl]:
+        for rpass in layer:
             output = self.get_output( rpass['output'] )
             
             if output == 'Image' and not output_node.inputs[ output ].links:
@@ -290,7 +290,7 @@ class create_nodes( bpy.types.Operator ):
                         links,
                         node,
                         output_node, 
-                        layers[rl] ,
+                        layers[rl],
                         rl
                     )
             else:

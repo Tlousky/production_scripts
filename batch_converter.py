@@ -2,10 +2,7 @@ import bpy
 from os import listdir
 from os.path import join, isdir, isfile
 
-tifDir = "C:/Users/TLOUSKY/Google Drive/PlatFORM/PQ_shades_app/FaceModels/images/depth"
-pngDir = "C:/Users/TLOUSKY/Google Drive/PlatFORM/PQ_shades_app/FaceModels/images/depth/png"
-
-class match_rotation(bpy.types.Operator):
+class batch_convert(bpy.types.Operator):
     bl_idname      = "render.batch_convert"
     bl_label       = "Batch Convert"
     bl_description = "Batch convert source images to destination format"
@@ -35,11 +32,12 @@ class match_rotation(bpy.types.Operator):
         for ntype in [ 'CompositorNodeImage', 'CompositorNodeComposite' ]:
             t.nodes.new( ntype )
 
+        out     = t.nodes['Composite']
         imgNode = t.nodes["Image"]
         img = t.nodes["Image"].image
 
         # Connect nodes
-
+        t.links( out.inputs[0], imgNode.outputs[0] )
 
         source     = props.source_folder
         sourceImgs = [
@@ -50,7 +48,8 @@ class match_rotation(bpy.types.Operator):
 
         destination = props.source_folder
         for f in sourceImgs:
-            img.filepath      = join( source, f )
+            newname           = props.prefix + f[:-4] + props.suffix + f[-4:]
+            img.filepath      = join( source, newname )
             S.render.filepath = join( destination, f[:-4] + extension )
             bpy.ops.render.render( write_still = True )
 
@@ -83,6 +82,9 @@ class LayoutDemoPanel(bpy.types.Panel):
         bc.prop( P, "source_folder"      )
         bc.prop( P, "destination_folder" )
 
+        bc.prop( P, "prefix" )
+        bc.prop( P, "suffix" )
+
         col.operator( 'render.batch_convert' )
 
 class batchConverterProps( bpy.types.PropertyGroup ):
@@ -96,6 +98,16 @@ class batchConverterProps( bpy.types.PropertyGroup ):
         description = "Folder of destination files",
         name        = "Destination folder",
         subtype     = 'FILE_PATH'
+    )
+
+    prefix = bpy.props.StringProperty(
+        description = "Add a prefix before each filename",
+        name        = "Prefix"
+    )
+
+    suffix = bpy.props.StringProperty(
+        description = "Add a suffix after each filename",
+        name        = "Suffix"
     )
 
 def register():

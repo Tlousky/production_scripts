@@ -45,11 +45,11 @@ class batch_convert(bpy.types.Operator):
             t.nodes.new( ntype )
 
         out     = t.nodes['Composite']
-        imgNode = t.nodes["Image"]
-        img = t.nodes["Image"].image
+        imgNode = t.nodes['Image']
+        img     = imgNode.image
 
         # Connect nodes
-        t.links( out.inputs[0], imgNode.outputs[0] )
+        t.links.new( out.inputs[0], imgNode.outputs[0] )
 
         source     = props.source_folder
         sourceImgs = [

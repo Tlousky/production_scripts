@@ -1,3 +1,15 @@
+# Author: Tamir Lousky
+
+bl_info = {
+    "name"        : "Batch Converter",
+    "author"      : "Tamir Lousky",
+    "blender"     : (2, 74, 0),
+    "version"     : (0, 0, 0, 1),
+    "location"    : "3D View > Toolbox",
+    "description" : "Batch convert image file formats",
+    "category"    : "Convert"
+}
+
 import bpy
 from os import listdir
 from os.path import join, isdir, isfile
@@ -55,13 +67,13 @@ class batch_convert(bpy.types.Operator):
 
         return {'FINISHED'}
 
-class LayoutDemoPanel(bpy.types.Panel):
-    """Creates a Panel in the scene context of the properties editor"""
-    bl_label       = "Layout Demo"
-    bl_idname      = "SCENE_PT_layout"
-    bl_space_type  = 'PROPERTIES'
-    bl_region_type = 'WINDOW'
-    bl_context     = "scene"
+class batchConverterPanel(bpy.types.Panel):
+    ''' Batch converter '''
+    bl_label       = "Batch Converter"
+    bl_idname      = "batch_converter"
+    bl_category    = "Convert"
+    bl_space_type  = 'VIEW_3D'
+    bl_region_type = 'TOOLS'
 
     def draw(self, context):
         layout = self.layout
@@ -73,9 +85,8 @@ class LayoutDemoPanel(bpy.types.Panel):
         b  = col.box()
         bc = b.column()
 
-        bc.label(
-            text = "Warning: pressing 'Batch Convert'\nwill replace your node setup!"
-        )
+        bc.label( text = "Warning: pressing 'Batch Convert'" )
+        bc.label( text = "will delete your render node setup!" )
 
         b  = col.box()
         bc = b.column()

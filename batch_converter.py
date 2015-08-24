@@ -46,7 +46,6 @@ class batch_convert(bpy.types.Operator):
 
         out     = t.nodes['Composite']
         imgNode = t.nodes['Image']
-        img     = imgNode.image
 
         # Connect nodes
         t.links.new( out.inputs[0], imgNode.outputs[0] )
@@ -56,13 +55,24 @@ class batch_convert(bpy.types.Operator):
             f for f in listdir( source ) if isfile( join( source, f ) )
         ]
 
+        bpy.ops.image.open(
+            filepath      = join( source, sourceImgs[0] ),
+            directory     = source,
+            files         = [ { 'name' : sourceImgs[0] } ],
+            relative_path = False
+
+        )
+
+        img           = bpy.data.images[ sourceImgs[0] ]
+        imgNode.image = img
+
         extension = S.render.file_extension
 
-        destination = props.source_folder
+        destination = props.destination_folder
         for f in sourceImgs:
-            newname           = props.prefix + f[:-4] + props.suffix + f[-4:]
-            img.filepath      = join( source, newname )
-            S.render.filepath = join( destination, f[:-4] + extension )
+            newname           = props.prefix + f[:-4] + props.suffix + extension
+            img.filepath      = join( source, f )
+            S.render.filepath = join( destination, newname )
             bpy.ops.render.render( write_still = True )
 
         return {'FINISHED'}

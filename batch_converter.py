@@ -1,10 +1,18 @@
 # Author: Tamir Lousky
 
+# Changes:
+# V0.002: Added ability to keep source resolution, fixed bug that causes
+#         cropping when using a render percentage under 100%.
+
+# Known issues:
+# 1. When images are packed into the blendfile and the file was saved, the
+#    script cannot load images and only packed images will be converted and saved.
+
 bl_info = {
     "name"        : "Batch Converter",
     "author"      : "Tamir Lousky",
     "blender"     : (2, 74, 0),
-    "version"     : (0, 0, 0, 1),
+    "version"     : (0, 0, 0, 2),
     "location"    : "3D View > Toolbox",
     "description" : "Batch convert image file formats",
     "category"    : "Convert"
@@ -89,6 +97,7 @@ class batch_convert(bpy.types.Operator):
             newname           = props.prefix + f[:-4] + props.suffix + extension
             img.filepath      = join( source, f )
             S.render.filepath = join( destination, newname )
+
             bpy.ops.render.render( write_still = True )
 
         return {'FINISHED'}
@@ -119,10 +128,10 @@ class batchConverterPanel(bpy.types.Panel):
         bc.prop( P, "source_folder"      )
         bc.prop( P, "destination_folder" )
 
-        bc.prop( P, "keepOriginalRes"    )
-
         bc.prop( P, "prefix" )
         bc.prop( P, "suffix" )
+
+        bc.prop( P, "keepOriginalRes"    )
 
         col.operator( 'render.batch_convert' )
 
@@ -141,7 +150,7 @@ class batchConverterProps( bpy.types.PropertyGroup ):
 
     keepOriginalRes = bpy.props.BoolProperty(
         description = "Keep original image's resolution",
-        name        = "Use Original Resolution",
+        name        = "Keep Original Resolution",
         default     = False
     )
 

@@ -88,15 +88,15 @@ class batch_convert(bpy.types.Operator):
                 scale.inputs[ axis ].default_value = p
 
         for f in sourceImgs:
+            newname           = props.prefix + f[:-4] + props.suffix + extension
+            img.filepath      = join( source, f )
+            S.render.filepath = join( destination, newname )
+
             if props.keepOriginalRes:
                 imgX, imgY = img.size
                 S.render.resolution_x          = imgX
                 S.render.resolution_y          = imgY
                 S.render.resolution_percentage = 100
-
-            newname           = props.prefix + f[:-4] + props.suffix + extension
-            img.filepath      = join( source, f )
-            S.render.filepath = join( destination, newname )
 
             bpy.ops.render.render( write_still = True )
 

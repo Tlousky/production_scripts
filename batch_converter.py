@@ -120,7 +120,6 @@ class batchConverterPanel(bpy.types.Panel):
         bc.prop( P, "source_folder"      )
         bc.prop( P, "destination_folder" )
 
-        bc.prop( P, "destination_folder" )
         bc.prop( P, "keepOriginalRes"    )
 
         bc.prop( P, "prefix" )

@@ -41,14 +41,20 @@ class batch_convert(bpy.types.Operator):
             t.nodes.remove( n )
 
         # Generate nodes
-        for ntype in [ 'CompositorNodeImage', 'CompositorNodeComposite' ]:
+        for ntype in [
+            'CompositorNodeImage',
+            'CompositorNodeComposite',
+            'CompositorNodeScale'
+        ]:
             t.nodes.new( ntype )
 
         out     = t.nodes['Composite']
+        scale   = t.nodes['Scale']
         imgNode = t.nodes['Image']
 
         # Connect nodes
-        t.links.new( out.inputs[0], imgNode.outputs[0] )
+        t.links.new( out.inputs[0],   scale.outputs[0]   )
+        t.links.new( scale.inputs[0], imgNode.outputs[0] )
 
         source     = props.source_folder
         sourceImgs = [
@@ -66,10 +72,21 @@ class batch_convert(bpy.types.Operator):
         img           = bpy.data.images[ sourceImgs[0] ]
         imgNode.image = img
 
-        extension = S.render.file_extension
-
+        extension   = S.render.file_extension
         destination = props.destination_folder
+
+        if not props.keepOriginalRes:
+            p = S.render.resolution_percentage / 100
+            for axis in ['X','Y']:
+                scale.inputs[ axis ].default_value = p
+
         for f in sourceImgs:
+            if props.keepOriginalRes:
+                imgX, imgY = img.size
+                S.render.resolution_x          = imgX
+                S.render.resolution_y          = imgY
+                S.render.resolution_percentage = 100
+
             newname           = props.prefix + f[:-4] + props.suffix + extension
             img.filepath      = join( source, f )
             S.render.filepath = join( destination, newname )
@@ -103,6 +120,9 @@ class batchConverterPanel(bpy.types.Panel):
         bc.prop( P, "source_folder"      )
         bc.prop( P, "destination_folder" )
 
+        bc.prop( P, "destination_folder" )
+        bc.prop( P, "keepOriginalRes"    )
+
         bc.prop( P, "prefix" )
         bc.prop( P, "suffix" )
 
@@ -119,6 +139,12 @@ class batchConverterProps( bpy.types.PropertyGroup ):
         description = "Folder of destination files",
         name        = "Destination folder",
         subtype     = 'FILE_PATH'
+    )
+
+    keepOriginalRes = bpy.props.BoolProperty(
+        description = "Keep original image's resolution",
+        name        = "Use Original Resolution",
+        default     = False
     )
 
     prefix = bpy.props.StringProperty(

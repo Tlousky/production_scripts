@@ -66,7 +66,6 @@ class batch_convert(bpy.types.Operator):
             directory     = source,
             files         = [ { 'name' : sourceImgs[0] } ],
             relative_path = False
-
         )
 
         img           = bpy.data.images[ sourceImgs[0] ]

@@ -33,8 +33,8 @@
 
 bl_info = {
     "name"       : "Save Layers and Passes in respectively named folders.",
-    "author"     : "Tamir Lousky (Original Author), Luciano Muñoz (added folder creation functionality)",
-    "version"    : (0, 0, 4),
+    "author"     : "Tamir Lousky (Original Author), Luciano Muñoz (added folder creation functionality), Jule Marcoueille (added single file output option)",
+    "version"    : (0, 0, 5),
     "blender"    : (2, 68, 0),
     "category"   : "Render",
     "location"   : "Node Editor >> Tools",
